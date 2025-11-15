@@ -1,0 +1,268 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  FLUTTER_VERSION: '3.27.2'
+  JAVA_VERSION: '17'
+
+jobs:
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          release_name: Release v${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+
+  build-android-release:
+    name: Build Android Release
+    needs: create-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build APK
+        run: flutter build apk --release --build-name=${{ needs.create-release.outputs.version }}
+
+      - name: Build App Bundle
+        run: flutter build appbundle --release --build-name=${{ needs.create-release.outputs.version }}
+
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: build/app/outputs/flutter-apk/app-release.apk
+          asset_name: serve-to-be-free-${{ needs.create-release.outputs.version }}.apk
+          asset_content_type: application/vnd.android.package-archive
+
+      - name: Upload App Bundle to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: build/app/outputs/bundle/release/app-release.aab
+          asset_name: serve-to-be-free-${{ needs.create-release.outputs.version }}.aab
+          asset_content_type: application/octet-stream
+
+  build-ios-release:
+    name: Build iOS Release
+    needs: create-release
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build iOS
+        run: flutter build ios --release --no-codesign --build-name=${{ needs.create-release.outputs.version }}
+
+      - name: Create IPA
+        run: |
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r serve-to-be-free-${{ needs.create-release.outputs.version }}.ipa Payload
+
+      - name: Upload IPA to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: build/ios/iphoneos/serve-to-be-free-${{ needs.create-release.outputs.version }}.ipa
+          asset_name: serve-to-be-free-${{ needs.create-release.outputs.version }}.ipa
+          asset_content_type: application/octet-stream
+
+  build-macos-release:
+    name: Build macOS Release
+    needs: create-release
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build macOS
+        run: flutter build macos --release --build-name=${{ needs.create-release.outputs.version }}
+
+      - name: Create macOS archive
+        run: |
+          cd build/macos/Build/Products/Release
+          zip -r serve-to-be-free-${{ needs.create-release.outputs.version }}-macos.zip serve_to_be_free.app
+
+      - name: Upload macOS to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: build/macos/Build/Products/Release/serve-to-be-free-${{ needs.create-release.outputs.version }}-macos.zip
+          asset_name: serve-to-be-free-${{ needs.create-release.outputs.version }}-macos.zip
+          asset_content_type: application/zip
+
+  build-windows-release:
+    name: Build Windows Release
+    needs: create-release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build Windows
+        run: flutter build windows --release --build-name=${{ needs.create-release.outputs.version }}
+
+      - name: Create Windows archive
+        run: |
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\windows\serve-to-be-free-${{ needs.create-release.outputs.version }}-windows.zip
+
+      - name: Upload Windows to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: build\windows\serve-to-be-free-${{ needs.create-release.outputs.version }}-windows.zip
+          asset_name: serve-to-be-free-${{ needs.create-release.outputs.version }}-windows.zip
+          asset_content_type: application/zip
+
+  build-linux-release:
+    name: Build Linux Release
+    needs: create-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build Linux
+        run: flutter build linux --release --build-name=${{ needs.create-release.outputs.version }}
+
+      - name: Create Linux archive
+        run: |
+          cd build/linux/x64/release
+          tar -czf serve-to-be-free-${{ needs.create-release.outputs.version }}-linux.tar.gz bundle
+
+      - name: Upload Linux to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: build/linux/x64/release/serve-to-be-free-${{ needs.create-release.outputs.version }}-linux.tar.gz
+          asset_name: serve-to-be-free-${{ needs.create-release.outputs.version }}-linux.tar.gz
+          asset_content_type: application/gzip
