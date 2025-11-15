@@ -1,0 +1,43 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [ main, develop, staging ]
+
+env:
+  FLUTTER_VERSION: '3.27.2'
+
+jobs:
+  quick-check:
+    name: Quick PR Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Check formatting
+        run: dart format --set-exit-if-changed .
+
+      - name: Analyze code
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Check for outdated dependencies
+        run: flutter pub outdated
+        continue-on-error: true
