@@ -1,0 +1,846 @@
+lib/features/rewards/screens/convert_points_screen.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/services/rewards_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+
+  class ConvertPointsScreen extends StatefulWidget {
+    const ConvertPointsScreen({Key? key}) : super(key: key);
+
+    @override
+    State<ConvertPointsScreen> createState() => _ConvertPointsScreenState();
+  }
+
+  class _ConvertPointsScreenState extends State<ConvertPointsScreen> {
+    final _formKey = GlobalKey<FormState>();
+    final _pointsController = TextEditingController();
+    double _servDRAmount = 0.0;
+    bool _isConverting = false;
+    String? _errorMessage;
+    bool _conversionComplete = false;
+    
+    // Conversion rate
+    static const double _conversionRate = 0.01; // 100 points = 1 SERV DR
+    static const int _minConversion = 1000; // Minimum 1000 points
+    
+    @override
+    void initState() {
+      super.initState();
+      _pointsController.addListener(_updateServDRAmount);
+    }
+    
+    @override
+    void dispose() {
+      _pointsController.dispose();
+      super.dispose();
+    }
+    
+    void _updateServDRAmount() {
+      setState(() {
+        final pointsText = _pointsController.text.trim();
+        final points = int.tryParse(pointsText) ?? 0;
+        _servDRAmount = points * _conversionRate;
+      });
+    }
+    
+    Future<void> _convertPoints() async {
+      if (!_formKey.currentState!.validate()) {
+        return;
+      }
+      
+      setState(() {
+        _isConverting = true;
+        _errorMessage = null;
+      });
+      
+      try {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final rewardsProvider = Provider.of<RewardsProvider>(context, listen: false);
+        
+        if (authProvider.user == null) {
+          throw Exception('User not authenticated');
+        }
+        
+        final pointsText = _pointsController.text.trim();
+        final points = int.parse(pointsText);
+        
+        final success = await rewardsProvider.convertPointsToServDR(
+          authProvider.user!.id,
+          points,
+        );
+        
+        if (success) {
+          setState(() {
+            _isConverting = false;
+            _conversionComplete = true;
+          });
+        } else {
+          setState(() {
+            _isConverting = false;
+            _errorMessage = rewardsProvider.errorMessage ?? 'Conversion failed';
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _isConverting = false;
+          _errorMessage = e.toString();
+        });
+      }
+    }
+    
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Convert Points'),
+        ),
+        body: Consumer<RewardsProvider>(
+          builder: (context, rewardsProvider, child) {
+            final wallet = rewardsProvider.wallet;
+            
+            if (wallet == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            
+            if (_conversionComplete) {
+              return _buildSuccessScreen();
+            }
+            
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Balance Info
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceDarkColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Available Balance',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.textSecondaryDarkColor,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${wallet.stbfPoints} Points',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Info box
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.infoColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppTheme.infoColor,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'About SERV DR',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: AppTheme.infoColor,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'SERV Digital Rewards (SERV DR) are stored on the STBF blockchain and can be redeemed for exclusive rewards from our partners. Once converted, points cannot be converted back.',
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Conversion rate: 100 Points = 1 SERV DR',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            'Minimum conversion: 1,000 Points',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Error message
+                    if (_errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.errorColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            color: AppTheme.errorColor,
+                          ),
+                        ),
+                      ),
+                    
+                    // Conversion form
+                    const Text(
+                      'Points to Convert',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    TextFormField(
+                      controller: _pointsController,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter points amount',
+                        suffixText: 'Points',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter points amount';
+                        }
+                        
+                        final points = int.tryParse(value);
+                        if (points == null) {
+                          return 'Please enter a valid number';
+                        }
+                        
+                        if (points < _minConversion) {
+                          return 'Minimum conversion is $_minConversion points';
+                        }
+                        
+                        if (points > wallet.stbfPoints) {
+                          return 'You don\'t have enough points';
+                        }
+                        
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // SERV DR amount
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'You will receive',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.textSecondaryDarkColor,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${_servDRAmount.toStringAsFixed(2)} SERV DR',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    
+                    // Convert Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isConverting ? null : _convertPoints,
+                        child: _isConverting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Convert Points'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    
+    Widget _buildSuccessScreen() {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.check_circle,
+                size: 80,
+                color: AppTheme.successColor,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Conversion Successful!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'You have successfully converted ${_pointsController.text} Points to ${_servDRAmount.toStringAsFixed(2)} SERV DR',
+                style: const TextStyle(
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'The SERV DR tokens have been added to your wallet and can be used to redeem rewards in the marketplace.',
+                style: TextStyle(
+                  color: AppTheme.textSecondaryDarkColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 36),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+lib/features/rewards/screens/rewards_marketplace_screen.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/services/rewards_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/rewards/widgets/reward_card.dart';
+  import 'package:serve_to_be_free/features/rewards/screens/reward_detail_screen.dart';
+
+  class RewardsMarketplaceScreen extends StatefulWidget {
+    const RewardsMarketplaceScreen({Key? key}) : super(key: key);
+
+    @override
+    State<RewardsMarketplaceScreen> createState() => _RewardsMarketplaceScreenState();
+  }
+
+  class _RewardsMarketplaceScreenState extends State<RewardsMarketplaceScreen> {
+    final ScrollController _scrollController = ScrollController();
+    int _currentPage = 1;
+    bool _hasMoreData = true;
+    String? _selectedCategory;
+    double? _maxCost;
+    
+    @override
+    void initState() {
+      super.initState();
+      _loadRewards();
+      _setupScrollListener();
+    }
+    
+    @override
+    void dispose() {
+      _scrollController.dispose();
+      super.dispose();
+    }
+    
+    void _setupScrollListener() {
+      _scrollController.addListener(() {
+        if (_scrollController.position.pixels >= 
+            _scrollController.position.maxScrollExtent - 200 &&
+            !Provider.of<RewardsProvider>(context, listen: false).isLoading &&
+            _hasMoreData) {
+          _loadMoreRewards();
+        }
+      });
+    }
+    
+    Future<void> _loadRewards() async {
+      final rewardsProvider = Provider.of<RewardsProvider>(context, listen: false);
+      
+      try {
+        await rewardsProvider.fetchAvailableRewards(
+          category: _selectedCategory,
+          maxServDRCost: _maxCost,
+          page: 1,
+          pageSize: 20,
+          reset: true,
+        );
+        
+        setState(() {
+          _currentPage = 1;
+          _hasMoreData = rewardsProvider.availableRewards.length >= 20;
+        });
+      } catch (e) {
+        // Error handled in provider
+      }
+    }
+    
+    Future<void> _loadMoreRewards() async {
+      if (Provider.of<RewardsProvider>(context, listen: false).isLoading) {
+        return;
+      }
+      
+      final rewardsProvider = Provider.of<RewardsProvider>(context, listen: false);
+      
+      try {
+        final nextPage = _currentPage + 1;
+        
+        await rewardsProvider.fetchAvailableRewards(
+          category: _selectedCategory,
+          maxServDRCost: _maxCost,
+          page: nextPage,
+          pageSize: 20,
+          reset: false,
+        );
+        
+        final rewardsCount = rewardsProvider.availableRewards.length;
+        
+        setState(() {
+          _currentPage = nextPage;
+          _hasMoreData = rewardsCount >= nextPage * 20;
+        });
+      } catch (e) {
+        // Error handled in provider
+      }
+    }
+    
+    Future<void> _refreshRewards() async {
+      await _loadRewards();
+    }
+    
+    void _applyFilters({String? category, double? maxCost}) {
+      setState(() {
+        _selectedCategory = category;
+        _maxCost = maxCost;
+      });
+      
+      _loadRewards();
+    }
+    
+    void _clearFilters() {
+      setState(() {
+        _selectedCategory = null;
+        _maxCost = null;
+      });
+      
+      _loadRewards();
+    }
+    
+    void _showFilterDialog() {
+      showDialog(
+        context: context,
+        builder: (context) {
+          String? tempCategory = _selectedCategory;
+          double? tempMaxCost = _maxCost;
+          
+          return AlertDialog(
+            title: const Text('Filter Rewards'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Category filter
+                  const Text(
+                    'Category',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilterChip(
+                        label: const Text('All'),
+                        selected: tempCategory == null,
+                        onSelected: (selected) {
+                          if (selected) {
+                            tempCategory = null;
+                          }
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('Retail'),
+                        selected: tempCategory == 'Retail',
+                        onSelected: (selected) {
+                          if (selected) {
+                            tempCategory = 'Retail';
+                          } else if (tempCategory == 'Retail') {
+                            tempCategory = null;
+                          }
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('Dining'),
+                        selected: tempCategory == 'Dining',
+                        onSelected: (selected) {
+                          if (selected) {
+                            tempCategory = 'Dining';
+                          } else if (tempCategory == 'Dining') {
+                            tempCategory = null;
+                          }
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('Entertainment'),
+                        selected: tempCategory == 'Entertainment',
+                        onSelected: (selected) {
+                          if (selected) {
+                            tempCategory = 'Entertainment';
+                          } else if (tempCategory == 'Entertainment') {
+                            tempCategory = null;
+                          }
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('Gift Cards'),
+                        selected: tempCategory == 'Gift Cards',
+                        onSelected: (selected) {
+                          if (selected) {
+                            tempCategory = 'Gift Cards';
+                          } else if (tempCategory == 'Gift Cards') {
+                            tempCategory = null;
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Max cost filter
+                  const Text(
+                    'Maximum Cost',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilterChip(
+                        label: const Text('Any'),
+                        selected: tempMaxCost == null,
+                        onSelected: (selected) {
+                          if (selected) {
+                            tempMaxCost = null;
+                          }
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('5 SERV DR'),
+                        selected: tempMaxCost == 5,
+                        onSelected: (selected) {
+                          if (selected) {
+                            tempMaxCost = 5;
+                          } else if (tempMaxCost == 5) {
+                            tempMaxCost = null;
+                          }
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('10 SERV DR'),
+                        selected: tempMaxCost == 10,
+                        onSelected: (selected) {
+                          if (selected) {
+                            tempMaxCost = 10;
+                          } else if (tempMaxCost == 10) {
+                            tempMaxCost = null;
+                          }
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('20 SERV DR'),
+                        selected: tempMaxCost == 20,
+                        onSelected: (selected) {
+                          if (selected) {
+                            tempMaxCost = 20;
+                          } else if (tempMaxCost == 20) {
+                            tempMaxCost = null;
+                          }
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('50 SERV DR'),
+                        selected: tempMaxCost == 50,
+                        onSelected: (selected) {
+                          if (selected) {
+                            tempMaxCost = 50;
+                          } else if (tempMaxCost == 50) {
+                            tempMaxCost = null;
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _clearFilters();
+                },
+                child: const Text('Clear All'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _applyFilters(
+                    category: tempCategory,
+                    maxCost: tempMaxCost,
+                  );
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+    
+    void _navigateToRewardDetail(String rewardId) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => RewardDetailScreen(rewardId: rewardId),
+        ),
+      );
+    }
+    
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Rewards Marketplace'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: _showFilterDialog,
+              tooltip: 'Filter',
+            ),
+          ],
+        ),
+        body: Consumer2<RewardsProvider, AuthProvider>(
+          builder: (context, rewardsProvider, authProvider, child) {
+            final rewards = rewardsProvider.availableRewards;
+            final wallet = rewardsProvider.wallet;
+            final isLoading = rewardsProvider.isLoading;
+            final errorMessage = rewardsProvider.errorMessage;
+            
+            if (isLoading && rewards.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            
+            if (errorMessage != null && rewards.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: AppTheme.errorColor,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error: $errorMessage',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppTheme.errorColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _refreshRewards,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            return Column(
+              children: [
+                // Wallet balance card
+                if (wallet != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.account_balance_wallet,
+                          color: AppTheme.primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Balance: ${wallet.servDRBalance.toStringAsFixed(2)} SERV DR',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                
+                // Active filters
+                if (_selectedCategory != null || _maxCost != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (_selectedCategory != null)
+                          Chip(
+                            label: Text('Category: $_selectedCategory'),
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                            onDeleted: () {
+                              setState(() {
+                                _selectedCategory = null;
+                              });
+                              _loadRewards();
+                            },
+                          ),
+                        if (_maxCost != null)
+                          Chip(
+                            label: Text('Max: $_maxCost SERV DR'),
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                            onDeleted: () {
+                              setState(() {
+                                _maxCost = null;
+                              });
+                              _loadRewards();
+                            },
+                          ),
+                        if (_selectedCategory != null || _maxCost != null)
+                          ActionChip(
+                            label: const Text('Clear All'),
+                            onPressed: _clearFilters,
+                          ),
+                      ],
+                    ),
+                  ),
+                
+                // Rewards grid
+                Expanded(
+                  child: rewards.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.card_giftcard,
+                                size: 64,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _selectedCategory != null || _maxCost != null
+                                    ? 'No rewards match your filters'
+                                    : 'No rewards available',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              if (_selectedCategory != null || _maxCost != null) ...[
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _clearFilters,
+                                  child: const Text('Clear Filters'),
+                                ),
+                              ],
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _refreshRewards,
+                          child: GridView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.7,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                            ),
+                            itemCount: rewards.length + (isLoading && _hasMoreData ? 2 : 0),
+                            itemBuilder: (context, index) {
+                              // Loading indicators at the bottom
+                              if (index >= rewards.length) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+                              
+                              final reward = rewards[index];
+                              return RewardCard(
+                                reward: reward,
+                                onTap: () => _navigateToRewardDetail(reward.id),
+                              );
+                            },
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+  }

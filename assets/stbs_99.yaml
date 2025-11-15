@@ -1,0 +1,578 @@
+lib/features/rewards/widgets/wallet_summary_card.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:intl/intl.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/rewards/models/wallet_model.dart';
+
+  class WalletSummaryCard extends StatelessWidget {
+    final WalletModel wallet;
+    final VoidCallback? onPointsHistoryTap;
+    final VoidCallback? onServDRHistoryTap;
+    
+    const WalletSummaryCard({
+      Key? key,
+      required this.wallet,
+      this.onPointsHistoryTap,
+      this.onServDRHistoryTap,
+    }) : super(key: key);
+
+    @override
+    Widget build(BuildContext context) {
+      return Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'My Wallet',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // STBF Points
+              InkWell(
+                onTap: onPointsHistoryTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.emoji_events,
+                        color: AppTheme.primaryColor,
+                        size: 36,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'STBF Points',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.textSecondaryDarkColor,
+                              ),
+                            ),
+                            Text(
+                              '${wallet.stbfPoints}',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              if (wallet.stbfPointsExpiringSoon > 0) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warningColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: AppTheme.warningColor,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${wallet.stbfPointsExpiringSoon} points expiring on ${DateFormat.yMMMd().format(wallet.nextExpirationDate!)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.warningColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              
+              const SizedBox(height: 16),
+              
+              // SERV DR
+              InkWell(
+                onTap: onServDRHistoryTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.token,
+                        color: AppTheme.accentColor,
+                        size: 36,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'SERV DR',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.textSecondaryDarkColor,
+                              ),
+                            ),
+                            Text(
+                              wallet.servDRBalance.toStringAsFixed(2),
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: AppTheme.accentColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // SERV Coin
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: wallet.servCoinWalletActivated
+                      ? AppTheme.secondaryColor.withOpacity(0.1)
+                      : Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.monetization_on,
+                      color: wallet.servCoinWalletActivated
+                          ? AppTheme.secondaryColor
+                          : Colors.grey,
+                      size: 36,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'SERV Coin',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.textSecondaryDarkColor,
+                            ),
+                          ),
+                          wallet.servCoinWalletActivated
+                              ? Text(
+                                  wallet.servCoinBalance.toStringAsFixed(2),
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : const Text(
+                                  'Not activated',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                        ],
+                      ),
+                    ),
+                    if (wallet.servCoinWalletActivated)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.secondaryColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Active',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.secondaryColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+lib/features/rewards/widgets/reward_category_card.dart: |
+  import 'package:flutter/material.dart';
+
+  class RewardCategoryCard extends StatelessWidget {
+    final IconData icon;
+    final String title;
+    final Color color;
+    final VoidCallback onTap;
+    
+    const RewardCategoryCard({
+      Key? key,
+      required this.icon,
+      required this.title,
+      required this.color,
+      required this.onTap,
+    }) : super(key: key);
+
+    @override
+    Widget build(BuildContext context) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 100,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: color.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: color,
+                size: 36,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+lib/features/rewards/widgets/points_transaction_tile.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:intl/intl.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/rewards/models/points_transaction_model.dart';
+
+  class PointsTransactionTile extends StatelessWidget {
+    final PointsTransactionModel transaction;
+    
+    const PointsTransactionTile({
+      Key? key,
+      required this.transaction,
+    }) : super(key: key);
+
+    @override
+    Widget build(BuildContext context) {
+      final bool isEarning = transaction.points > 0;
+      
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              // Transaction icon
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isEarning
+                      ? AppTheme.successColor.withOpacity(0.1)
+                      : AppTheme.primaryColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isEarning ? Icons.add_circle : Icons.swap_horiz,
+                  color: isEarning ? AppTheme.successColor : AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(width: 16),
+              
+              // Transaction details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getTransactionTitle(transaction),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      DateFormat.yMMMd().add_jm().format(transaction.timestamp),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondaryDarkColor,
+                      ),
+                    ),
+                    if (transaction.expirationDate != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Expires: ${DateFormat.yMMMd().format(transaction.expirationDate!)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _isExpiringSoon(transaction.expirationDate!)
+                              ? AppTheme.warningColor
+                              : AppTheme.textSecondaryDarkColor,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              
+              // Points amount
+              Text(
+                isEarning ? '+${transaction.points}' : '${transaction.points}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isEarning ? AppTheme.successColor : AppTheme.primaryColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    String _getTransactionTitle(PointsTransactionModel transaction) {
+      switch (transaction.transactionType) {
+        case 'service_completion':
+          return 'Service Completion';
+        case 'conversion':
+          return 'Converted to SERV DR';
+        case 'bonus':
+          return 'Bonus Points';
+        case 'expiration':
+          return 'Points Expired';
+        case 'adjustment':
+          return 'Points Adjustment';
+        default:
+          return transaction.description ?? 'Transaction';
+      }
+    }
+    
+    bool _isExpiringSoon(DateTime expirationDate) {
+      final now = DateTime.now();
+      final difference = expirationDate.difference(now).inDays;
+      return difference <= 30 && difference >= 0;
+    }
+  }
+
+lib/features/rewards/widgets/reward_card.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/rewards/models/reward_model.dart';
+
+  class RewardCard extends StatelessWidget {
+    final RewardModel reward;
+    final VoidCallback onTap;
+    
+    const RewardCard({
+      Key? key,
+      required this.reward,
+      required this.onTap,
+    }) : super(key: key);
+
+    @override
+    Widget build(BuildContext context) {
+      return Card(
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: InkWell(
+          onTap: reward.isAvailable ? onTap : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Reward Image
+              Stack(
+                children: [
+                  SizedBox(
+                    height: 120,
+                    width: double.infinity,
+                    child: reward.imageUrl != null
+                        ? Image.network(
+                            reward.imageUrl!,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            color: AppTheme.surfaceDarkColor,
+                            child: const Icon(
+                              Icons.card_giftcard,
+                              size: 48,
+                              color: AppTheme.textSecondaryDarkColor,
+                            ),
+                          ),
+                  ),
+                  if (!reward.isAvailable)
+                    Container(
+                      height: 120,
+                      width: double.infinity,
+                      color: Colors.black.withOpacity(0.6),
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.errorColor,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            reward.isExpired
+                                ? 'EXPIRED'
+                                : reward.isOutOfStock
+                                    ? 'OUT OF STOCK'
+                                    : 'UNAVAILABLE',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  
+                  // Merchant Logo
+                  if (reward.merchantLogoUrl != null)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(2),
+                        child: ClipOval(
+                          child: Image.network(
+                            reward.merchantLogoUrl!,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              
+              // Reward Details
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      reward.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      reward.merchantName,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondaryDarkColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.token,
+                          color: AppTheme.primaryColor,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${reward.servDRCost} SERV DR',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }

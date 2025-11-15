@@ -1,0 +1,890 @@
+lib/core/services/user_service.dart: |
+  import 'dart:async';
+  import 'package:flutter/foundation.dart';
+  import 'package:serve_to_be_free/core/services/mqtt_service.dart';
+  import 'package:serve_to_be_free/features/auth/models/user_model.dart';
+  import 'package:serve_to_be_free/features/auth/models/skill_model.dart';
+  
+  class UserService {
+    final MqttService _mqttService;
+    
+    // MQTT Topics
+    static const String _userRequestTopic = 'stbf/user/request';
+    static const String _userResponseTopic = 'stbf/user/response';
+    
+    UserService(this._mqttService) {
+      _init();
+    }
+    
+    Future<void> _init() async {
+      // Subscribe to user response topic
+      await _mqttService.subscribe(_userResponseTopic);
+    }
+    
+    // Get user profile details
+    Future<UserModel> getUserProfile(String userId) async {
+      try {
+        final response = await _mqttService.request(
+          _userRequestTopic,
+          _userResponseTopic,
+          {
+            'action': 'get_profile',
+            'userId': userId,
+          }
+        );
+        
+        if (response['status'] == 'success') {
+          return UserModel.fromJson(response['user']);
+        } else {
+          throw Exception(response['message'] ?? 'Failed to get user profile');
+        }
+      } catch (e) {
+        throw Exception('Failed to get user profile: $e');
+      }
+    }
+    
+    // Update user profile
+    Future<UserModel> updateUserProfile(
+      String userId,
+      Map<String, dynamic> updates,
+    ) async {
+      try {
+        final requestData = {
+          'action': 'update_profile',
+          'userId': userId,
+          ...updates,
+        };
+        
+        final response = await _mqttService.request(
+          _userRequestTopic,
+          _userResponseTopic,
+          requestData
+        );
+        
+        if (response['status'] == 'success') {
+          return UserModel.fromJson(response['user']);
+        } else {
+          throw Exception(response['message'] ?? 'Failed to update user profile');
+        }
+      } catch (e) {
+        throw Exception('Failed to update user profile: $e');
+      }
+    }
+    
+    // Get user skills
+    Future<List<SkillModel>> getUserSkills(String userId) async {
+      try {
+        final response = await _mqttService.request(
+          _userRequestTopic,
+          _userResponseTopic,
+          {
+            'action': 'get_skills',
+            'userId': userId,
+          }
+        );
+        
+        if (response['status'] == 'success') {
+          final List<dynamic> skillsJson = response['skills'];
+          return skillsJson.map((json) => SkillModel.fromJson(json)).toList();
+        } else {
+          throw Exception(response['message'] ?? 'Failed to get user skills');
+        }
+      } catch (e) {
+        throw Exception('Failed to get user skills: $e');
+      }
+    }
+    
+    // Update user skills
+    Future<List<SkillModel>> updateUserSkills(
+      String userId,
+      List<SkillModel> skills,
+    ) async {
+      try {
+        final skillsJson = skills.map((skill) => skill.toJson()).toList();
+        
+        final response = await _mqttService.request(
+          _userRequestTopic,
+          _userResponseTopic,
+          {
+            'action': 'update_skills',
+            'userId': userId,
+            'skills': skillsJson,
+          }
+        );
+        
+        if (response['status'] == 'success') {
+          final List<dynamic> updatedSkillsJson = response['skills'];
+          return updatedSkillsJson.map((json) => SkillModel.fromJson(json)).toList();
+        } else {
+          throw Exception(response['message'] ?? 'Failed to update user skills');
+        }
+      } catch (e) {
+        throw Exception('Failed to update user skills: $e');
+      }
+    }
+    
+    // Get user service history
+    Future<Map<String, dynamic>> getUserServiceHistory(
+      String userId,
+      {int page = 1, int pageSize = 10}
+    ) async {
+      try {
+        final response = await _mqttService.request(
+          _userRequestTopic,
+          _userResponseTopic,
+          {
+            'action': 'get_service_history',
+            'userId': userId,
+            'page': page,
+            'pageSize': pageSize,
+          }
+        );
+        
+        if (response['status'] == 'success') {
+          return {
+            'history': response['history'],
+            'totalPages': response['totalPages'],
+            'currentPage': response['currentPage'],
+            'totalItems': response['totalItems'],
+          };
+        } else {
+          throw Exception(response['message'] ?? 'Failed to get service history');
+        }
+      } catch (e) {
+        throw Exception('Failed to get service history: $e');
+      }
+    }
+    
+    // Get user notifications
+    Future<List<dynamic>> getUserNotifications(
+      String userId,
+      {int page = 1, int pageSize = 20}
+    ) async {
+      try {
+        final response = await _mqttService.request(
+          _userRequestTopic,
+          _userResponseTopic,
+          {
+            'action': 'get_notifications',
+            'userId': userId,
+            'page': page,
+            'pageSize': pageSize,
+          }
+        );
+        
+        if (response['status'] == 'success') {
+          return response['notifications'];
+        } else {
+          throw Exception(response['message'] ?? 'Failed to get notifications');
+        }
+      } catch (e) {
+        throw Exception('Failed to get notifications: $e');
+      }
+    }
+    
+    // Mark notification as read
+    Future<bool> markNotificationAsRead(String userId, String notificationId) async {
+      try {
+        final response = await _mqttService.request(
+          _userRequestTopic,
+          _userResponseTopic,
+          {
+            'action': 'mark_notification_read',
+            'userId': userId,
+            'notificationId': notificationId,
+          }
+        );
+        
+        return response['status'] == 'success';
+      } catch (e) {
+        throw Exception('Failed to mark notification as read: $e');
+      }
+    }
+    
+    // Get user privacy settings
+    Future<Map<String, dynamic>> getUserPrivacySettings(String userId) async {
+      try {
+        final response = await _mqttService.request(
+          _userRequestTopic,
+          _userResponseTopic,
+          {
+            'action': 'get_privacy_settings',
+            'userId': userId,
+          }
+        );
+        
+        if (response['status'] == 'success') {
+          return response['settings'];
+        } else {
+          throw Exception(response['message'] ?? 'Failed to get privacy settings');
+        }
+      } catch (e) {
+        throw Exception('Failed to get privacy settings: $e');
+      }
+    }
+    
+    // Update user privacy settings
+    Future<bool> updateUserPrivacySettings(
+      String userId,
+      Map<String, dynamic> settings,
+    ) async {
+      try {
+        final response = await _mqttService.request(
+          _userRequestTopic,
+          _userResponseTopic,
+          {
+            'action': 'update_privacy_settings',
+            'userId': userId,
+            'settings': settings,
+          }
+        );
+        
+        return response['status'] == 'success';
+      } catch (e) {
+        throw Exception('Failed to update privacy settings: $e');
+      }
+    }
+  }
+  
+  class UserProvider with ChangeNotifier {
+    final UserService _userService;
+    final AuthProvider _authProvider;
+    UserModel? _user;
+    
+    UserModel? get user => _user;
+    bool get isLoading => _isLoading;
+    List<SkillModel> get skills => _skills;
+    
+    bool _isLoading = false;
+    List<SkillModel> _skills = [];
+    
+    UserProvider(this._userService, this._authProvider, [this._user]);
+    
+    // Fetch and update current user profile
+    Future<void> fetchUserProfile() async {
+      if (_authProvider.user == null) return;
+      
+      _isLoading = true;
+      notifyListeners();
+      
+      try {
+        _user = await _userService.getUserProfile(_authProvider.user!.id);
+        _isLoading = false;
+        notifyListeners();
+      } catch (e) {
+        _isLoading = false;
+        notifyListeners();
+        rethrow;
+      }
+    }
+    
+    // Update user profile
+    Future<void> updateProfile(Map<String, dynamic> updates) async {
+      if (_authProvider.user == null) return;
+      
+      _isLoading = true;
+      notifyListeners();
+      
+      try {
+        _user = await _userService.updateUserProfile(_authProvider.user!.id, updates);
+        _isLoading = false;
+        notifyListeners();
+      } catch (e) {
+        _isLoading = false;
+        notifyListeners();
+        rethrow;
+      }
+    }
+    
+    // Fetch user skills
+    Future<void> fetchSkills() async {
+      if (_authProvider.user == null) return;
+      
+      _isLoading = true;
+      notifyListeners();
+      
+      try {
+        _skills = await _userService.getUserSkills(_authProvider.user!.id);
+        _isLoading = false;
+        notifyListeners();
+      } catch (e) {
+        _isLoading = false;
+        notifyListeners();
+        rethrow;
+      }
+    }
+    
+    // Update user skills
+    Future<void> updateSkills(List<SkillModel> skills) async {
+      if (_authProvider.user == null) return;
+      
+      _isLoading = true;
+      notifyListeners();
+      
+      try {
+        _skills = await _userService.updateUserSkills(_authProvider.user!.id, skills);
+        _isLoading = false;
+        notifyListeners();
+      } catch (e) {
+        _isLoading = false;
+        notifyListeners();
+        rethrow;
+      }
+    }
+    
+    // Fetch user service history
+    Future<Map<String, dynamic>> getServiceHistory({int page = 1, int pageSize = 10}) async {
+      if (_authProvider.user == null) {
+        throw Exception('User not authenticated');
+      }
+      
+      return await _userService.getUserServiceHistory(
+        _authProvider.user!.id,
+        page: page,
+        pageSize: pageSize,
+      );
+    }
+    
+    // Get user notifications
+    Future<List<dynamic>> getNotifications({int page = 1, int pageSize = 20}) async {
+      if (_authProvider.user == null) {
+        throw Exception('User not authenticated');
+      }
+      
+      return await _userService.getUserNotifications(
+        _authProvider.user!.id,
+        page: page,
+        pageSize: pageSize,
+      );
+    }
+    
+    // Mark notification as read
+    Future<bool> markNotificationAsRead(String notificationId) async {
+      if (_authProvider.user == null) {
+        throw Exception('User not authenticated');
+      }
+      
+      return await _userService.markNotificationAsRead(
+        _authProvider.user!.id,
+        notificationId,
+      );
+    }
+  }
+
+lib/features/auth/models/user_model.dart: |
+  import 'package:json_annotation/json_annotation.dart';
+
+  part 'user_model.g.dart';
+
+  @JsonSerializable()
+  class UserModel {
+    final String id;
+    final String email;
+    final String firstName;
+    final String lastName;
+    final String? phoneNumber;
+    final String? location;
+    final String? profileImageUrl;
+    final String? bio;
+    final DateTime createdAt;
+    final DateTime updatedAt;
+    final List<String>? roles;
+    final bool isVerified;
+    final String? status;
+
+    const UserModel({
+      required this.id,
+      required this.email,
+      required this.firstName,
+      required this.lastName,
+      this.phoneNumber,
+      this.location,
+      this.profileImageUrl,
+      this.bio,
+      required this.createdAt,
+      required this.updatedAt,
+      this.roles,
+      required this.isVerified,
+      this.status,
+    });
+
+    // Full name getter
+    String get fullName => '$firstName $lastName';
+
+    // Initial getter for avatar
+    String get initials {
+      if (firstName.isNotEmpty && lastName.isNotEmpty) {
+        return '${firstName[0]}${lastName[0]}';
+      } else if (firstName.isNotEmpty) {
+        return firstName[0];
+      } else if (lastName.isNotEmpty) {
+        return lastName[0];
+      }
+      return '';
+    }
+
+    // Has role method
+    bool hasRole(String role) {
+      return roles?.contains(role) ?? false;
+    }
+
+    // Factory method to create user from JSON
+    factory UserModel.fromJson(Map<String, dynamic> json) => 
+        _$UserModelFromJson(json);
+
+    // Method to convert user to JSON
+    Map<String, dynamic> toJson() => _$UserModelToJson(this);
+
+    // Copy with method to create a new instance with some properties changed
+    UserModel copyWith({
+      String? firstName,
+      String? lastName,
+      String? phoneNumber,
+      String? location,
+      String? profileImageUrl,
+      String? bio,
+      List<String>? roles,
+      bool? isVerified,
+      String? status,
+    }) {
+      return UserModel(
+        id: id,
+        email: email,
+        firstName: firstName ?? this.firstName,
+        lastName: lastName ?? this.lastName,
+        phoneNumber: phoneNumber ?? this.phoneNumber,
+        location: location ?? this.location,
+        profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+        bio: bio ?? this.bio,
+        createdAt: createdAt,
+        updatedAt: DateTime.now(),
+        roles: roles ?? this.roles,
+        isVerified: isVerified ?? this.isVerified,
+        status: status ?? this.status,
+      );
+    }
+  }
+
+lib/features/auth/models/skill_model.dart: |
+  import 'package:json_annotation/json_annotation.dart';
+
+  part 'skill_model.g.dart';
+
+  @JsonSerializable()
+  class SkillModel {
+    final String id;
+    final String name;
+    final int proficiencyLevel;
+    final String? category;
+    final bool isVerified;
+    final DateTime? lastUsed;
+
+    const SkillModel({
+      required this.id,
+      required this.name,
+      required this.proficiencyLevel,
+      this.category,
+      this.isVerified = false,
+      this.lastUsed,
+    });
+
+    // Factory method to create skill from JSON
+    factory SkillModel.fromJson(Map<String, dynamic> json) => 
+        _$SkillModelFromJson(json);
+
+    // Method to convert skill to JSON
+    Map<String, dynamic> toJson() => _$SkillModelToJson(this);
+
+    // Copy with method to create a new instance with some properties changed
+    SkillModel copyWith({
+      String? name,
+      int? proficiencyLevel,
+      String? category,
+      bool? isVerified,
+      DateTime? lastUsed,
+    }) {
+      return SkillModel(
+        id: id,
+        name: name ?? this.name,
+        proficiencyLevel: proficiencyLevel ?? this.proficiencyLevel,
+        category: category ?? this.category,
+        isVerified: isVerified ?? this.isVerified,
+        lastUsed: lastUsed ?? this.lastUsed,
+      );
+    }
+  }
+
+lib/features/auth/auth_wrapper.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/features/auth/screens/login_screen.dart';
+  import 'package:serve_to_be_free/features/home/screens/home_screen.dart';
+
+  class AuthWrapper extends StatelessWidget {
+    const AuthWrapper({Key? key}) : super(key: key);
+
+    @override
+    Widget build(BuildContext context) {
+      final authProvider = Provider.of<AuthProvider>(context);
+      
+      // Show loading spinner while checking authentication status
+      if (authProvider.isAuthenticating) {
+        return const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+      
+      // Redirect based on authentication status
+      if (authProvider.isAuthenticated) {
+        return const HomeScreen();
+      } else {
+        return const LoginScreen();
+      }
+    }
+  }
+
+lib/features/auth/screens/login_screen.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/auth/screens/register_screen.dart';
+  import 'package:serve_to_be_free/features/auth/screens/reset_password_screen.dart';
+  import 'package:serve_to_be_free/features/auth/widgets/social_login_button.dart';
+
+  class LoginScreen extends StatefulWidget {
+    const LoginScreen({Key? key}) : super(key: key);
+
+    @override
+    State<LoginScreen> createState() => _LoginScreenState();
+  }
+
+  class _LoginScreenState extends State<LoginScreen> {
+    final _formKey = GlobalKey<FormState>();
+    final _emailController = TextEditingController();
+    final _passwordController = TextEditingController();
+    bool _isLoading = false;
+    bool _obscurePassword = true;
+    String? _errorMessage;
+
+    @override
+    void dispose() {
+      _emailController.dispose();
+      _passwordController.dispose();
+      super.dispose();
+    }
+
+    Future<void> _login() async {
+      if (!_formKey.currentState!.validate()) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      try {
+        await Provider.of<AuthProvider>(context, listen: false).login(
+          _emailController.text.trim(),
+          _passwordController.text,
+        );
+      } catch (e) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Logo and Title
+                  const Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.volunteer_activism,
+                          size: 64,
+                          color: AppTheme.primaryColor,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Serve To Be Free',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Sign in to your account',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppTheme.textSecondaryDarkColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Error message if any
+                  if (_errorMessage != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.errorColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(
+                          color: AppTheme.errorColor,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  if (_errorMessage != null) const SizedBox(height: 16),
+
+                  // Login Form
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Email Field
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: Icon(Icons.email_outlined),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                .hasMatch(value)) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                          enabled: !_isLoading,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Password Field
+                        TextFormField(
+                          controller: _passwordController,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                          ),
+                          obscureText: _obscurePassword,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your password';
+                            }
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
+                          enabled: !_isLoading,
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Forgot Password Link
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const ResetPasswordScreen(),
+                                      ),
+                                    );
+                                  },
+                            child: const Text('Forgot Password?'),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Login Button
+                        ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Login'),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Or Divider
+                        Row(
+                          children: const [
+                            Expanded(
+                              child: Divider(thickness: 1),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                'OR',
+                                style: TextStyle(
+                                  color: AppTheme.textSecondaryDarkColor,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Divider(thickness: 1),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Social Login Buttons
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            SocialLoginButton(
+                              icon: Icons.facebook,
+                              color: const Color(0xFF3b5998),
+                              onPressed: _isLoading
+                                  ? null
+                                  : () async {
+                                      setState(() {
+                                        _isLoading = true;
+                                      });
+                                      try {
+                                        await Provider.of<AuthProvider>(context,
+                                                listen: false)
+                                            .loginWithSocial('facebook');
+                                      } catch (e) {
+                                        setState(() {
+                                          _errorMessage = e.toString();
+                                          _isLoading = false;
+                                        });
+                                      }
+                                    },
+                            ),
+                            SocialLoginButton(
+                              icon: Icons.g_mobiledata,
+                              color: const Color(0xFFdb4437),
+                              onPressed: _isLoading
+                                  ? null
+                                  : () async {
+                                      setState(() {
+                                        _isLoading = true;
+                                      });
+                                      try {
+                                        await Provider.of<AuthProvider>(context,
+                                                listen: false)
+                                            .loginWithSocial('google');
+                                      } catch (e) {
+                                        setState(() {
+                                          _errorMessage = e.toString();
+                                          _isLoading = false;
+                                        });
+                                      }
+                                    },
+                            ),
+                            SocialLoginButton(
+                              icon: Icons.apple,
+                              color: Colors.white,
+                              iconColor: Colors.black,
+                              onPressed: _isLoading
+                                  ? null
+                                  : () async {
+                                      setState(() {
+                                        _isLoading = true;
+                                      });
+                                      try {
+                                        await Provider.of<AuthProvider>(context,
+                                                listen: false)
+                                            .loginWithSocial('apple');
+                                      } catch (e) {
+                                        setState(() {
+                                          _errorMessage = e.toString();
+                                          _isLoading = false;
+                                        });
+                                      }
+                                    },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+
+                        // Register Link
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              "Don't have an account? ",
+                              style: TextStyle(
+                                color: AppTheme.textSecondaryDarkColor,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _isLoading
+                                  ? null
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const RegisterScreen(),
+                                        ),
+                                      );
+                                    },
+                              child: const Text('Register'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+  }

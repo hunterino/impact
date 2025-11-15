@@ -1,0 +1,768 @@
+lib/features/volunteer_management/screens/create_team_screen.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/services/volunteer_service.dart';
+  import 'package:serve_to_be_free/core/services/project_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/screens/team_detail_screen.dart';
+
+  class CreateTeamScreen extends StatefulWidget {
+    const CreateTeamScreen({Key? key}) : super(key: key);
+
+    @override
+    State<CreateTeamScreen> createState() => _CreateTeamScreenState();
+  }
+
+  class _CreateTeamScreenState extends State<CreateTeamScreen> {
+    final _formKey = GlobalKey<FormState>();
+    final _nameController = TextEditingController();
+    final _descriptionController = TextEditingController();
+    final List<String> _selectedFocusAreas = [];
+    
+    bool _isLoading = false;
+    String? _errorMessage;
+    
+    @override
+    void dispose() {
+      _nameController.dispose();
+      _descriptionController.dispose();
+      super.dispose();
+    }
+    
+    Future<void> _createTeam() async {
+      if (!_formKey.currentState!.validate()) {
+        return;
+      }
+      
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      
+      try {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final volunteerProvider = Provider.of<VolunteerProvider>(context, listen: false);
+        
+        if (authProvider.user == null) {
+          throw Exception('User not authenticated');
+        }
+        
+        final team = await volunteerProvider.createTeam(
+          authProvider.user!.id,
+          _nameController.text.trim(),
+          _descriptionController.text.trim(),
+          _selectedFocusAreas.isEmpty ? null : _selectedFocusAreas,
+        );
+        
+        if (mounted) {
+          Navigator.pop(context);
+          
+          // Navigate to team details screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TeamDetailScreen(teamId: team.id),
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+    
+    @override
+    Widget build(BuildContext context) {
+      final projectProvider = Provider.of<ProjectProvider>(context);
+      final causeAreas = projectProvider.causeAreas;
+      
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Create Team'),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Error message
+                if (_errorMessage != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.errorColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(
+                        color: AppTheme.errorColor,
+                      ),
+                    ),
+                  ),
+                
+                // Team Name
+                const Text(
+                  'Team Name',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter team name',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a team name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                
+                // Team Description
+                const Text(
+                  'Description (Optional)',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    hintText: 'Describe your team\'s mission and goals',
+                    alignLabelWithHint: true,
+                  ),
+                  maxLines: 4,
+                ),
+                const SizedBox(height: 24),
+                
+                // Focus Areas
+                const Text(
+                  'Focus Areas (Optional)',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Select the causes your team is most interested in:',
+                  style: TextStyle(
+                    color: AppTheme.textSecondaryDarkColor,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: causeAreas.map((area) {
+                    final isSelected = _selectedFocusAreas.contains(area);
+                    return FilterChip(
+                      label: Text(area),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedFocusAreas.add(area);
+                          } else {
+                            _selectedFocusAreas.remove(area);
+                          }
+                        });
+                      },
+                      backgroundColor: Colors.grey[800],
+                      selectedColor: AppTheme.primaryColor.withOpacity(0.7),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 32),
+                
+                // Create Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _createTeam,
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text('Create Team'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+lib/features/volunteer_management/widgets/commitment_card.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:intl/intl.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/models/commitment_model.dart';
+
+  class CommitmentCard extends StatelessWidget {
+    final CommitmentModel commitment;
+    final bool isPast;
+    final VoidCallback? onCancel;
+    final VoidCallback? onLogHours;
+    
+    const CommitmentCard({
+      Key? key,
+      required this.commitment,
+      this.isPast = false,
+      this.onCancel,
+      this.onLogHours,
+    }) : super(key: key);
+
+    @override
+    Widget build(BuildContext context) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Project Image or Header
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              child: commitment.projectImageUrl != null
+                  ? Image.network(
+                      commitment.projectImageUrl!,
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      height: 80,
+                      width: double.infinity,
+                      color: AppTheme.primaryColor,
+                      child: Center(
+                        child: Icon(
+                          Icons.volunteer_activism,
+                          size: 40,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ),
+                    ),
+            ),
+            
+            // Project Details
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Project Title
+                  Text(
+                    commitment.projectTitle,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Date and Time
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        DateFormat.yMMMMEEEEd().format(commitment.commitmentDate),
+                        style: const TextStyle(
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${DateFormat.jm().format(commitment.startTime)} - ${DateFormat.jm().format(commitment.endTime)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  // Number of Volunteers
+                  if (commitment.numberOfVolunteers > 1) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.people,
+                          size: 16,
+                          color: AppTheme.primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${commitment.numberOfVolunteers} volunteers registered',
+                          style: const TextStyle(
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Status Chip
+                  Chip(
+                    label: Text(commitment.status),
+                    backgroundColor: _getStatusColor(commitment.status).withOpacity(0.1),
+                    labelStyle: TextStyle(
+                      color: _getStatusColor(commitment.status),
+                      fontSize: 12,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  // Action Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (isPast && onLogHours != null && commitment.isCompleted)
+                        ElevatedButton(
+                          onPressed: onLogHours,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.secondaryColor,
+                          ),
+                          child: const Text('Log Hours'),
+                        ),
+                      if (!isPast && onCancel != null)
+                        TextButton(
+                          onPressed: onCancel,
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.errorColor,
+                          ),
+                          child: const Text('Cancel'),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    Color _getStatusColor(String status) {
+      switch (status.toLowerCase()) {
+        case 'confirmed':
+          return AppTheme.successColor;
+        case 'pending':
+          return AppTheme.warningColor;
+        case 'cancelled':
+          return AppTheme.errorColor;
+        case 'completed':
+          return AppTheme.infoColor;
+        default:
+          return AppTheme.primaryColor;
+      }
+    }
+  }
+
+lib/features/volunteer_management/widgets/service_record_card.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:intl/intl.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/models/service_record_model.dart';
+
+  class ServiceRecordCard extends StatelessWidget {
+    final ServiceRecordModel record;
+    final VoidCallback onTap;
+    
+    const ServiceRecordCard({
+      Key? key,
+      required this.record,
+      required this.onTap,
+    }) : super(key: key);
+
+    @override
+    Widget build(BuildContext context) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Project Title and Status
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        record.projectTitle,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(record.status).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        record.status,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _getStatusColor(record.status),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                
+                // Date
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      DateFormat.yMMMd().format(record.serviceDate),
+                      style: const TextStyle(
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                
+                // Time
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.access_time,
+                      size: 16,
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${DateFormat.jm().format(record.startTime)} - ${DateFormat.jm().format(record.endTime)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                // Hours and Points
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.timer,
+                          size: 16,
+                          color: AppTheme.primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${record.hoursServed} hours',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star,
+                          size: 16,
+                          color: AppTheme.accentColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${record.pointsEarned} points',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accentColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
+    Color _getStatusColor(String status) {
+      switch (status.toLowerCase()) {
+        case 'verified':
+          return AppTheme.successColor;
+        case 'pending':
+          return AppTheme.warningColor;
+        case 'rejected':
+          return AppTheme.errorColor;
+        default:
+          return AppTheme.infoColor;
+      }
+    }
+  }
+
+lib/features/volunteer_management/widgets/team_card.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/models/team_model.dart';
+
+  class TeamCard extends StatelessWidget {
+    final TeamModel team;
+    final VoidCallback onTap;
+    
+    const TeamCard({
+      Key? key,
+      required this.team,
+      required this.onTap,
+    }) : super(key: key);
+
+    @override
+    Widget build(BuildContext context) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Team Image
+                CircleAvatar(
+                  radius: 32,
+                  backgroundImage: team.imageUrl != null
+                      ? NetworkImage(team.imageUrl!)
+                      : null,
+                  backgroundColor: AppTheme.primaryColor,
+                  child: team.imageUrl == null
+                      ? Text(
+                          team.name.substring(0, 1),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            color: Colors.white,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 16),
+                
+                // Team Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        team.name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (team.description != null)
+                        Text(
+                          team.description!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.textSecondaryDarkColor,
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _buildStat(
+                            Icons.people,
+                            '${team.memberCount} members',
+                            AppTheme.primaryColor,
+                          ),
+                          const SizedBox(width: 16),
+                          _buildStat(
+                            Icons.timer,
+                            '${team.totalServiceHours} hours',
+                            AppTheme.secondaryColor,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Arrow
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppTheme.textSecondaryDarkColor,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
+    Widget _buildStat(IconData icon, String text, Color color) {
+      return Row(
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 12,
+            ),
+          ),
+        ],
+      );
+    }
+  }
+
+lib/features/volunteer_management/widgets/team_member_tile.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/models/team_member_model.dart';
+
+  class TeamMemberTile extends StatelessWidget {
+    final TeamMemberModel member;
+    final bool isLeader;
+    
+    const TeamMemberTile({
+      Key? key,
+      required this.member,
+      this.isLeader = false,
+    }) : super(key: key);
+
+    @override
+    Widget build(BuildContext context) {
+      // Note: In a real implementation, you would need to fetch the user details
+      // This is a simplified version showing the structure
+      return ListTile(
+        leading: CircleAvatar(
+          backgroundColor: isLeader ? AppTheme.primaryColor : Colors.grey[800],
+          child: const Icon(
+            Icons.person,
+            color: Colors.white,
+          ),
+        ),
+        title: Row(
+          children: [
+            const Text('Member Name'), // This would come from user details
+            if (isLeader)
+              Container(
+                margin: const EdgeInsets.only(left: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Leader',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        subtitle: Text('${member.contributedHours} hours • ${member.contributedPoints} points'),
+        trailing: PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          onSelected: (value) {
+            // TODO: Implement actions
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'message',
+              child: Text('Message'),
+            ),
+            const PopupMenuItem(
+              value: 'profile',
+              child: Text('View Profile'),
+            ),
+          ],
+        ),
+      );
+    }
+  }

@@ -1,0 +1,823 @@
+lib/features/volunteer_management/screens/service_detail_screen.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:intl/intl.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/services/volunteer_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/models/service_record_model.dart';
+
+  class ServiceDetailScreen extends StatefulWidget {
+    final String recordId;
+    
+    const ServiceDetailScreen({
+      Key? key,
+      required this.recordId,
+    }) : super(key: key);
+
+    @override
+    State<ServiceDetailScreen> createState() => _ServiceDetailScreenState();
+  }
+
+  class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
+    ServiceRecordModel? _serviceRecord;
+    bool _isLoading = true;
+    String? _errorMessage;
+    
+    @override
+    void initState() {
+      super.initState();
+      _loadServiceRecord();
+    }
+    
+    Future<void> _loadServiceRecord() async {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      
+      try {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final volunteerProvider = Provider.of<VolunteerProvider>(context, listen: false);
+        
+        if (authProvider.user == null) {
+          throw Exception('User not authenticated');
+        }
+        
+        // Find the record in existing history first
+        final recordFromCache = volunteerProvider.serviceHistory.firstWhere(
+          (record) => record.id == widget.recordId,
+          orElse: () => throw Exception('Service record not found'),
+        );
+        
+        // Load full details from the API
+        final record = await volunteerProvider.getServiceRecordById(
+          authProvider.user!.id,
+          widget.recordId,
+        );
+        
+        setState(() {
+          _serviceRecord = record;
+          _isLoading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+    
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Service Details'),
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: AppTheme.errorColor,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error: $_errorMessage',
+                            style: const TextStyle(
+                              color: AppTheme.errorColor,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton(
+                            onPressed: _loadServiceRecord,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _serviceRecord == null
+                    ? const Center(child: Text('Service record not found'))
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Project Info Card
+                            Card(
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Project Image
+                                  if (_serviceRecord!.projectImageUrl != null)
+                                    Image.network(
+                                      _serviceRecord!.projectImageUrl!,
+                                      height: 150,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  
+                                  Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _serviceRecord!.projectTitle,
+                                          style: const TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        
+                                        // Date and Time
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.calendar_today,
+                                              size: 16,
+                                              color: AppTheme.primaryColor,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              DateFormat.yMMMMd().format(_serviceRecord!.serviceDate),
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.access_time,
+                                              size: 16,
+                                              color: AppTheme.primaryColor,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              '${DateFormat.jm().format(_serviceRecord!.startTime)} - ${DateFormat.jm().format(_serviceRecord!.endTime)}',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // Service Stats
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Hours',
+                                    _serviceRecord!.hoursServed.toStringAsFixed(1),
+                                    Icons.access_time,
+                                    AppTheme.primaryColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Points',
+                                    _serviceRecord!.pointsEarned.toString(),
+                                    Icons.star,
+                                    AppTheme.accentColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // Status
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(_serviceRecord!.status).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _getStatusColor(_serviceRecord!.status),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _getStatusIcon(_serviceRecord!.status),
+                                    color: _getStatusColor(_serviceRecord!.status),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Status: ${_serviceRecord!.status}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: _getStatusColor(_serviceRecord!.status),
+                                        ),
+                                      ),
+                                      if (_serviceRecord!.verifiedBy != null && _serviceRecord!.verifiedAt != null)
+                                        Text(
+                                          'Verified by ${_serviceRecord!.verifiedBy} on ${DateFormat.yMMMd().format(_serviceRecord!.verifiedAt!)}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // Skills Section
+                            if (_serviceRecord!.skills != null && _serviceRecord!.skills!.isNotEmpty) ...[
+                              const Text(
+                                'Skills Used',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: _serviceRecord!.skills!.map((skill) => Chip(
+                                  label: Text(skill),
+                                  backgroundColor: AppTheme.secondaryColor.withOpacity(0.1),
+                                  labelStyle: const TextStyle(
+                                    color: AppTheme.secondaryColor,
+                                  ),
+                                )).toList(),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+                            
+                            // Notes Section
+                            if (_serviceRecord!.notes != null && _serviceRecord!.notes!.isNotEmpty) ...[
+                              const Text(
+                                'Notes',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceDarkColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(_serviceRecord!.notes!),
+                              ),
+                            ],
+                            
+                            const SizedBox(height: 40),
+                          ],
+                        ),
+                      ),
+      );
+    }
+    
+    Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: color,
+              size: 32,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    Color _getStatusColor(String status) {
+      switch (status.toLowerCase()) {
+        case 'verified':
+          return AppTheme.successColor;
+        case 'pending':
+          return AppTheme.warningColor;
+        case 'rejected':
+          return AppTheme.errorColor;
+        default:
+          return AppTheme.infoColor;
+      }
+    }
+    
+    IconData _getStatusIcon(String status) {
+      switch (status.toLowerCase()) {
+        case 'verified':
+          return Icons.verified;
+        case 'pending':
+          return Icons.pending;
+        case 'rejected':
+          return Icons.cancel;
+        default:
+          return Icons.info;
+      }
+    }
+  }
+
+lib/features/volunteer_management/screens/team_screen.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/services/volunteer_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/widgets/team_card.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/screens/team_detail_screen.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/screens/create_team_screen.dart';
+
+  class TeamScreen extends StatefulWidget {
+    const TeamScreen({Key? key}) : super(key: key);
+
+    @override
+    State<TeamScreen> createState() => _TeamScreenState();
+  }
+
+  class _TeamScreenState extends State<TeamScreen> {
+    @override
+    void initState() {
+      super.initState();
+      _loadTeams();
+    }
+    
+    Future<void> _loadTeams() async {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final volunteerProvider = Provider.of<VolunteerProvider>(context, listen: false);
+      
+      if (authProvider.user != null) {
+        await volunteerProvider.fetchUserTeams(authProvider.user!.id);
+      }
+    }
+    
+    Future<void> _refreshData() async {
+      await _loadTeams();
+    }
+    
+    void _navigateToTeamDetail(String teamId) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TeamDetailScreen(teamId: teamId),
+        ),
+      );
+    }
+    
+    void _navigateToCreateTeam() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const CreateTeamScreen(),
+        ),
+      );
+    }
+    
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('My Teams'),
+        ),
+        body: Consumer<VolunteerProvider>(
+          builder: (context, volunteerProvider, child) {
+            if (volunteerProvider.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            
+            if (volunteerProvider.userTeams.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.group,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'You haven\'t joined any teams yet',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _navigateToCreateTeam,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Create a Team'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            return RefreshIndicator(
+              onRefresh: _refreshData,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: volunteerProvider.userTeams.length,
+                itemBuilder: (context, index) {
+                  final team = volunteerProvider.userTeams[index];
+                  return TeamCard(
+                    team: team,
+                    onTap: () => _navigateToTeamDetail(team.id),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _navigateToCreateTeam,
+          tooltip: 'Create Team',
+          child: const Icon(Icons.add),
+        ),
+      );
+    }
+  }
+
+lib/features/volunteer_management/screens/team_detail_screen.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:intl/intl.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/services/volunteer_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/models/team_model.dart';
+  import 'package:serve_to_be_free/features/volunteer_management/widgets/team_member_tile.dart';
+
+  class TeamDetailScreen extends StatefulWidget {
+    final String teamId;
+    
+    const TeamDetailScreen({
+      Key? key,
+      required this.teamId,
+    }) : super(key: key);
+
+    @override
+    State<TeamDetailScreen> createState() => _TeamDetailScreenState();
+  }
+
+  class _TeamDetailScreenState extends State<TeamDetailScreen> {
+    @override
+    void initState() {
+      super.initState();
+      _loadTeamDetails();
+    }
+    
+    Future<void> _loadTeamDetails() async {
+      final volunteerProvider = Provider.of<VolunteerProvider>(context, listen: false);
+      await volunteerProvider.fetchTeamDetails(widget.teamId);
+    }
+    
+    Future<void> _refreshData() async {
+      await _loadTeamDetails();
+    }
+    
+    Future<void> _leaveTeam() async {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Leave Team'),
+          content: const Text('Are you sure you want to leave this team?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                final volunteerProvider = Provider.of<VolunteerProvider>(context, listen: false);
+                
+                if (authProvider.user != null) {
+                  try {
+                    final success = await volunteerProvider.leaveTeam(
+                      authProvider.user!.id,
+                      widget.teamId,
+                    );
+                    
+                    if (success) {
+                      Navigator.of(context).pop(); // Go back to teams list
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to leave team'),
+                          backgroundColor: AppTheme.errorColor,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString()}'),
+                        backgroundColor: AppTheme.errorColor,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.errorColor,
+              ),
+              child: const Text('Leave'),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    void _inviteMembers() {
+      // TODO: Implement invite members functionality
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invite functionality coming soon'),
+        ),
+      );
+    }
+    
+    @override
+    Widget build(BuildContext context) {
+      return Consumer<VolunteerProvider>(
+        builder: (context, volunteerProvider, child) {
+          final team = volunteerProvider.currentTeam;
+          final members = volunteerProvider.teamMembers;
+          final isLoading = volunteerProvider.isLoading;
+          
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(team?.name ?? 'Team Details'),
+              actions: [
+                if (team != null)
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'leave') {
+                        _leaveTeam();
+                      } else if (value == 'invite') {
+                        _inviteMembers();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'invite',
+                        child: Text('Invite Members'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'leave',
+                        child: Text('Leave Team'),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            body: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : team == null
+                    ? const Center(child: Text('Team not found'))
+                    : RefreshIndicator(
+                        onRefresh: _refreshData,
+                        child: ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            // Team Header
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Team Image
+                                CircleAvatar(
+                                  radius: 40,
+                                  backgroundImage: team.imageUrl != null
+                                      ? NetworkImage(team.imageUrl!)
+                                      : null,
+                                  backgroundColor: AppTheme.primaryColor,
+                                  child: team.imageUrl == null
+                                      ? Text(
+                                          team.name.substring(0, 1),
+                                          style: const TextStyle(
+                                            fontSize: 30,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 16),
+                                
+                                // Team Info
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        team.name,
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Created ${DateFormat.yMMMd().format(team.createdAt)}',
+                                        style: const TextStyle(
+                                          color: AppTheme.textSecondaryDarkColor,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      if (team.description != null && team.description!.isNotEmpty)
+                                        Text(team.description!),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // Team Stats
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Members',
+                                    team.memberCount.toString(),
+                                    Icons.people,
+                                    AppTheme.primaryColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Hours',
+                                    team.totalServiceHours.toString(),
+                                    Icons.access_time,
+                                    AppTheme.secondaryColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Points',
+                                    team.totalPoints.toString(),
+                                    Icons.star,
+                                    AppTheme.accentColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // Focus Areas
+                            if (team.focusAreas != null && team.focusAreas!.isNotEmpty) ...[
+                              const Text(
+                                'Focus Areas',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: team.focusAreas!.map((area) => Chip(
+                                  label: Text(area),
+                                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                                  labelStyle: const TextStyle(
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                )).toList(),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+                            
+                            // Members List
+                            const Text(
+                              'Team Members',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            
+                            if (members.isEmpty)
+                              const Center(
+                                child: Text('No members found'),
+                              )
+                            else
+                              ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: members.length,
+                                itemBuilder: (context, index) {
+                                  final member = members[index];
+                                  final isLeader = member.role == 'leader';
+                                  
+                                  return TeamMemberTile(
+                                    member: member,
+                                    isLeader: isLeader,
+                                  );
+                                },
+                              ),
+                            
+                            const SizedBox(height: 16),
+                            
+                            // Invite Button
+                            OutlinedButton.icon(
+                              onPressed: _inviteMembers,
+                              icon: const Icon(Icons.person_add),
+                              label: const Text('Invite Members'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+          );
+        },
+      );
+    }
+    
+    Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: color,
+              size: 24,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }

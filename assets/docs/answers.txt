@@ -1,0 +1,4 @@
+The goal of the app is to provide relivant business intelligenct to franchisee and franchisor management.  Allowing information to drive business operations.
+
+Users of the system include Corperate offices and the franchisee locations.
+Primarily management, accounting, human resources and inventory management.

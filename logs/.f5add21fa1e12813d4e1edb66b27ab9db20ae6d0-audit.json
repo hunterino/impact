@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/michael/code/webdav/stbf/servicePortal/serve_to_be_free/logs/.f5add21fa1e12813d4e1edb66b27ab9db20ae6d0-audit.json",
+    "files": [
+        {
+            "date": 1761850581660,
+            "name": "/Users/michael/code/webdav/stbf/servicePortal/serve_to_be_free/logs/mcp-puppeteer-2025-10-30.log",
+            "hash": "6f6e6dec779745328de7fdfc6d7fffae4b8479d90c5ad848e876f12855fb4cee"
+        }
+    ],
+    "hashType": "sha256"
+}

@@ -1,0 +1,103 @@
+name: serve_to_be_free
+description: "Unified volunteer management platform with Supabase backend"
+publish_to: 'none'
+version: 2.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Core
+  supabase_flutter: ^2.3.0
+  provider: ^6.1.1
+  go_router: ^13.0.0
+
+  # UI
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.3.0
+  cached_network_image: ^3.3.0
+  shimmer: ^3.0.0
+
+  # Forms & Input
+  reactive_forms: ^17.0.0
+  flutter_datetime_picker_plus: ^2.2.0
+
+  # Storage & Security
+  hive_flutter: ^1.1.0
+  flutter_secure_storage: ^9.2.4
+
+  # Utilities
+  intl: ^0.20.2
+  collection: ^1.18.0
+  equatable: ^2.0.5
+  uuid: ^4.5.1
+  connectivity_plus: ^5.0.2
+  path_provider: ^2.1.2
+  mqtt_client: ^10.0.0
+
+  # Features
+  qr_code_scanner: ^1.0.1
+  qr_flutter: ^4.1.0
+  geolocator: ^11.0.0
+  google_maps_flutter: ^2.5.0
+  image_picker: ^1.1.2
+  share_plus: ^7.2.1
+  url_launcher: ^6.2.2
+  local_auth: ^2.2.0
+
+  # Notifications
+  flutter_local_notifications: ^16.2.0
+  # firebase_messaging: ^14.7.6
+  # firebase_core: ^2.24.2
+
+  # Code generation
+  json_annotation: ^4.9.0
+  freezed_annotation: ^2.4.1
+
+  # Custom dependency
+  # extractor:
+  #   git:
+  #     url: git@github.com:tps-reports/extractor.git
+  #     ref: main
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Code generation
+  build_runner: ^2.4.7
+  json_serializable: ^6.8.0
+  freezed: ^2.4.6
+  hive_generator: ^2.0.1
+
+  # Linting
+  flutter_lints: ^3.0.1
+
+  # Testing
+  mocktail: ^1.0.1
+  patrol: ^3.3.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+
+  # fonts:
+  #   - family: Inter
+  #     fonts:
+  #       - asset: assets/fonts/Inter-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/Inter-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Inter-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/Inter-Bold.ttf
+  #         weight: 700

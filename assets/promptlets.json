@@ -1,0 +1,67 @@
+{
+    [ 
+        {
+            "id": "output_yaml",
+            "description": "Generate Yaml Output",
+            "prompt": "
+                for each modules output, use a yaml format, with the key as the path and the value as the file content.  using this approach, generate each module 1 at a time, asking to generate the next module."
+        },
+        {
+            "id": "generate_flutter_ui",
+            "description": "Generate Flutter ui",
+            "prompt": ""
+        }
+    ]
+}
+        {
+            "id": "",
+            "description": "",
+            "prompt": ""
+        },
+        {
+            "id": "",
+            "description": "",
+            "prompt": ""
+        },
+        {
+            "id": "",
+            "description": "",
+            "prompt": ""
+        },
+        {
+            "id": "",
+            "description": "",
+            "prompt": ""
+        },
+        {
+            "id": "",
+            "description": "",
+            "prompt": ""
+        },
+        {
+            "id": "",
+            "description": "",
+            "prompt": ""
+        },
+        {
+            "id": "",
+            "description": "",
+            "prompt": ""
+        },
+        {
+            "id": "",
+            "description": "",
+            "prompt": ""
+        },
+        {
+            "id": "",
+            "description": "",
+            "prompt": ""
+        },
+        {
+            "id": "",
+            "description": "",
+            "prompt": ""
+        },
+    ]
+}

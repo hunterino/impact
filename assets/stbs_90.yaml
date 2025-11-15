@@ -1,0 +1,941 @@
+lib/features/service_opportunities/screens/create_project_screen.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:intl/intl.dart';
+  import 'package:image_picker/image_picker.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/services/project_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+
+  class CreateProjectScreen extends StatefulWidget {
+    const CreateProjectScreen({Key? key}) : super(key: key);
+
+    @override
+    State<CreateProjectScreen> createState() => _CreateProjectScreenState();
+  }
+
+  class _CreateProjectScreenState extends State<CreateProjectScreen> {
+    final _formKey = GlobalKey<FormState>();
+    final _titleController = TextEditingController();
+    final _descriptionController = TextEditingController();
+    final _locationController = TextEditingController();
+    DateTime? _startDate;
+    TimeOfDay? _startTime;
+    DateTime? _endDate;
+    TimeOfDay? _endTime;
+    bool _isRecurring = false;
+    String? _recurringPattern;
+    final _minVolunteersController = TextEditingController(text: '1');
+    final _maxVolunteersController = TextEditingController(text: '10');
+    double _pointsMultiplier = 1.0;
+    
+    List<String> _selectedCauseAreas = [];
+    List<String> _selectedRequiredSkills = [];
+    List<String> _tags = [];
+    List<XFile>? _pickedImages;
+    
+    bool _isLoading = false;
+    String? _errorMessage;
+    
+    @override
+    void initState() {
+      super.initState();
+      _loadCauseAreas();
+    }
+    
+    @override
+    void dispose() {
+      _titleController.dispose();
+      _descriptionController.dispose();
+      _locationController.dispose();
+      _minVolunteersController.dispose();
+      _maxVolunteersController.dispose();
+      super.dispose();
+    }
+    
+    Future<void> _loadCauseAreas() async {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Provider.of<ProjectProvider>(context, listen: false).fetchCauseAreas();
+      });
+    }
+    
+    Future<void> _pickImages() async {
+      final picker = ImagePicker();
+      final pickedFiles = await picker.pickMultiImage();
+      
+      if (pickedFiles.isNotEmpty) {
+        setState(() {
+          _pickedImages = pickedFiles;
+        });
+      }
+    }
+    
+    Future<void> _selectDate(BuildContext context, bool isStartDate) async {
+      final initialDate = isStartDate ? _startDate ?? DateTime.now() : _endDate ?? _startDate ?? DateTime.now();
+      final DateTime? picked = await showDatePicker(
+        context: context,
+        initialDate: initialDate,
+        firstDate: isStartDate ? DateTime.now() : _startDate ?? DateTime.now(),
+        lastDate: DateTime.now().add(const Duration(days: 365)),
+      );
+      
+      if (picked != null) {
+        setState(() {
+          if (isStartDate) {
+            _startDate = picked;
+            if (_endDate != null && _endDate!.isBefore(_startDate!)) {
+              _endDate = _startDate;
+            }
+          } else {
+            _endDate = picked;
+          }
+        });
+      }
+    }
+    
+    Future<void> _selectTime(BuildContext context, bool isStartTime) async {
+      final TimeOfDay? picked = await showTimePicker(
+        context: context,
+        initialTime: isStartTime ? _startTime ?? TimeOfDay.now() : _endTime ?? _startTime ?? TimeOfDay.now(),
+      );
+      
+      if (picked != null) {
+        setState(() {
+          if (isStartTime) {
+            _startTime = picked;
+          } else {
+            _endTime = picked;
+          }
+        });
+      }
+    }
+    
+    // Combine date and time into a DateTime object
+    DateTime _combineDateAndTime(DateTime date, TimeOfDay time) {
+      return DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+    }
+    
+    Future<void> _createProject() async {
+      if (!_formKey.currentState!.validate()) {
+        return;
+      }
+      
+      // Check if dates and times are selected
+      if (_startDate == null || _startTime == null || _endDate == null || _endTime == null) {
+        setState(() {
+          _errorMessage = 'Please select dates and times for the project';
+        });
+        return;
+      }
+      
+      // Check if cause areas are selected
+      if (_selectedCauseAreas.isEmpty) {
+        setState(() {
+          _errorMessage = 'Please select at least one cause area';
+        });
+        return;
+      }
+      
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      
+      try {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final projectProvider = Provider.of<ProjectProvider>(context, listen: false);
+        
+        // Create start and end DateTime objects
+        final startDateTime = _combineDateAndTime(_startDate!, _startTime!);
+        final endDateTime = _combineDateAndTime(_endDate!, _endTime!);
+        
+        // Prepare project data
+        final projectData = {
+          'title': _titleController.text.trim(),
+          'description': _descriptionController.text.trim(),
+          'organizerId': authProvider.user!.id,
+          'location': _locationController.text.trim(),
+          'startDate': startDateTime.toIso8601String(),
+          'endDate': endDateTime.toIso8601String(),
+          'minVolunteers': int.parse(_minVolunteersController.text),
+          'maxVolunteers': int.parse(_maxVolunteersController.text),
+          'requiredSkills': _selectedRequiredSkills,
+          'causeAreas': _selectedCauseAreas,
+          'tags': _tags,
+          'pointsMultiplier': _pointsMultiplier,
+          'isRecurring': _isRecurring,
+        };
+        
+        if (_isRecurring && _recurringPattern != null) {
+          projectData['recurringPattern'] = _recurringPattern;
+        }
+        
+        // TODO: Handle image upload to 5x platform
+        
+        // Create the project
+        final project = await projectProvider.createProject(projectData);
+        
+        // Navigate to the project details screen
+        if (mounted) {
+          Navigator.pop(context);
+          // Navigate to project detail screen
+        }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString();
+        });
+      }
+    }
+    
+    @override
+    Widget build(BuildContext context) {
+      final projectProvider = Provider.of<ProjectProvider>(context);
+      final causeAreas = projectProvider.causeAreas;
+      
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Create Project'),
+          actions: [
+            TextButton(
+              onPressed: _isLoading ? null : _createProject,
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Create',
+                      style: TextStyle(color: Colors.white),
+                    ),
+            ),
+          ],
+        ),
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              // Error message
+              if (_errorMessage != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(
+                      color: AppTheme.errorColor,
+                    ),
+                  ),
+                ),
+              
+              // Project Image
+              GestureDetector(
+                onTap: _pickImages,
+                child: Container(
+                  height: 200,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.grey[600]!,
+                      width: 1,
+                    ),
+                  ),
+                  child: _pickedImages != null && _pickedImages!.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset(
+                            _pickedImages!.first.path,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.add_photo_alternate,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Add Project Images',
+                              style: TextStyle(
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Project Title
+              TextFormField(
+                controller: _titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Project Title',
+                  hintText: 'Enter a descriptive title',
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a title';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Project Description
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'Describe what volunteers will be doing',
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 5,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a description';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Location
+              TextFormField(
+                controller: _locationController,
+                decoration: const InputDecoration(
+                  labelText: 'Location',
+                  hintText: 'Enter the project location',
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a location';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 24),
+              
+              // Date and Time Section
+              const Text(
+                'Date and Time',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Is Recurring Switch
+              Row(
+                children: [
+                  const Text('Is this a recurring project?'),
+                  const Spacer(),
+                  Switch(
+                    value: _isRecurring,
+                    onChanged: (value) {
+                      setState(() {
+                        _isRecurring = value;
+                      });
+                    },
+                    activeColor: AppTheme.primaryColor,
+                  ),
+                ],
+              ),
+              
+              // Recurring Pattern Dropdown (if recurring)
+              if (_isRecurring)
+                DropdownButtonFormField<String>(
+                  value: _recurringPattern,
+                  decoration: const InputDecoration(
+                    labelText: 'Recurring Pattern',
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Daily',
+                      child: Text('Daily'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Weekly',
+                      child: Text('Weekly'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Bi-weekly',
+                      child: Text('Bi-weekly'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Monthly',
+                      child: Text('Monthly'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _recurringPattern = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (_isRecurring && (value == null || value.isEmpty)) {
+                      return 'Please select a recurring pattern';
+                    }
+                    return null;
+                  },
+                ),
+              
+              const SizedBox(height: 16),
+              
+              // Start Date and Time
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _selectDate(context, true),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Start Date',
+                          prefixIcon: Icon(Icons.calendar_today),
+                        ),
+                        child: Text(
+                          _startDate != null
+                              ? DateFormat.yMMMd().format(_startDate!)
+                              : 'Select Date',
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _selectTime(context, true),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Start Time',
+                          prefixIcon: Icon(Icons.access_time),
+                        ),
+                        child: Text(
+                          _startTime != null
+                              ? _startTime!.format(context)
+                              : 'Select Time',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // End Date and Time
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _selectDate(context, false),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'End Date',
+                          prefixIcon: Icon(Icons.calendar_today),
+                        ),
+                        child: Text(
+                          _endDate != null
+                              ? DateFormat.yMMMd().format(_endDate!)
+                              : 'Select Date',
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _selectTime(context, false),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'End Time',
+                          prefixIcon: Icon(Icons.access_time),
+                        ),
+                        child: Text(
+                          _endTime != null
+                              ? _endTime!.format(context)
+                              : 'Select Time',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              // Volunteers Section
+              const Text(
+                'Volunteer Capacity',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Min and Max Volunteers
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _minVolunteersController,
+                      decoration: const InputDecoration(
+                        labelText: 'Min Volunteers',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Invalid number';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _maxVolunteersController,
+                      decoration: const InputDecoration(
+                        labelText: 'Max Volunteers',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Invalid number';
+                        }
+                        final min = int.tryParse(_minVolunteersController.text) ?? 0;
+                        final max = int.tryParse(value) ?? 0;
+                        if (max < min) {
+                          return 'Must be >= min';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // Points Multiplier
+              Text('Points Multiplier: ${_pointsMultiplier.toStringAsFixed(1)}x'),
+              Slider(
+                value: _pointsMultiplier,
+                min: 1.0,
+                max: 2.0,
+                divisions: 10,
+                label: '${_pointsMultiplier.toStringAsFixed(1)}x',
+                onChanged: (value) {
+                  setState(() {
+                    _pointsMultiplier = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 24),
+              
+              // Cause Areas Section
+              const Text(
+                'Cause Areas',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Select at least one cause area that your project addresses:',
+                style: TextStyle(
+                  color: AppTheme.textSecondaryDarkColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Cause Areas Chips
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: causeAreas.map((area) {
+                  final isSelected = _selectedCauseAreas.contains(area);
+                  return FilterChip(
+                    label: Text(area),
+                    selected: isSelected,
+                    backgroundColor: Colors.grey[800],
+                    selectedColor: AppTheme.primaryColor.withOpacity(0.7),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedCauseAreas.add(area);
+                        } else {
+                          _selectedCauseAreas.remove(area);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+              
+              // Required Skills Section
+              const Text(
+                'Required Skills',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Select skills that would be helpful for volunteers:',
+                style: TextStyle(
+                  color: AppTheme.textSecondaryDarkColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Skill Input
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      decoration: const InputDecoration(
+                        hintText: 'Add a required skill',
+                        suffixIcon: Icon(Icons.add_circle_outline),
+                      ),
+                      onFieldSubmitted: (value) {
+                        if (value.isNotEmpty && !_selectedRequiredSkills.contains(value)) {
+                          setState(() {
+                            _selectedRequiredSkills.add(value);
+                          });
+                          // Clear the text field
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) {
+                              final formFieldState = _formKey.currentState!.fields['skillInput'] as FormFieldState?;
+                              if (formFieldState != null) {
+                                formFieldState.reset();
+                              }
+                            }
+                          });
+                        }
+                      },
+                      name: 'skillInput',
+                    ),
+                  ),
+                ],
+              ),
+              
+              // Required Skills Chips
+              if (_selectedRequiredSkills.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _selectedRequiredSkills.map((skill) {
+                      return Chip(
+                        label: Text(skill),
+                        backgroundColor: AppTheme.secondaryColor.withOpacity(0.2),
+                        deleteIcon: const Icon(Icons.close, size: 18),
+                        onDeleted: () {
+                          setState(() {
+                            _selectedRequiredSkills.remove(skill);
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+              const SizedBox(height: 24),
+              
+              // Tags Section
+              const Text(
+                'Tags (Optional)',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Add tags to help volunteers find your project:',
+                style: TextStyle(
+                  color: AppTheme.textSecondaryDarkColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Tag Input
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      decoration: const InputDecoration(
+                        hintText: 'Add a tag',
+                        prefixIcon: Icon(Icons.tag),
+                      ),
+                      onFieldSubmitted: (value) {
+                        if (value.isNotEmpty && !_tags.contains(value)) {
+                          setState(() {
+                            _tags.add(value);
+                          });
+                          // Clear the text field
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) {
+                              final formFieldState = _formKey.currentState!.fields['tagInput'] as FormFieldState?;
+                              if (formFieldState != null) {
+                                formFieldState.reset();
+                              }
+                            }
+                          });
+                        }
+                      },
+                      name: 'tagInput',
+                    ),
+                  ),
+                ],
+              ),
+              
+              // Tags Chips
+              if (_tags.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _tags.map((tag) {
+                      return Chip(
+                        label: Text(tag),
+                        backgroundColor: Colors.grey[800],
+                        deleteIcon: const Icon(Icons.close, size: 18),
+                        onDeleted: () {
+                          setState(() {
+                            _tags.remove(tag);
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+lib/features/service_opportunities/widgets/project_card.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:intl/intl.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/service_opportunities/models/project_model.dart';
+
+  class ProjectCard extends StatelessWidget {
+    final ProjectModel project;
+    final bool isFeatured;
+    final VoidCallback onTap;
+    
+    const ProjectCard({
+      Key? key,
+      required this.project,
+      this.isFeatured = false,
+      required this.onTap,
+    }) : super(key: key);
+
+    @override
+    Widget build(BuildContext context) {
+      return Card(
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: isFeatured ? 4 : 2,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Project Image
+              Stack(
+                children: [
+                  SizedBox(
+                    height: 120,
+                    width: double.infinity,
+                    child: project.imageUrls != null && project.imageUrls!.isNotEmpty
+                        ? Image.network(
+                            project.imageUrls!.first,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            color: AppTheme.primaryColor,
+                            child: Center(
+                              child: Icon(
+                                Icons.volunteer_activism,
+                                size: 40,
+                                color: Colors.white.withOpacity(0.7),
+                              ),
+                            ),
+                          ),
+                  ),
+                  if (isFeatured)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Featured',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (project.isAtCapacity)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withOpacity(0.6),
+                        child: const Center(
+                          child: Text(
+                            'FULL',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              
+              // Project Details
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Project Title
+                    Text(
+                      project.title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    
+                    // Location
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 14,
+                          color: AppTheme.textSecondaryDarkColor,
+                        ),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            project.location,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondaryDarkColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    
+                    // Date
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 14,
+                          color: AppTheme.textSecondaryDarkColor,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          project.isRecurring
+                              ? '${project.recurringPattern} • Starting ${DateFormat.yMMMd().format(project.startDate)}'
+                              : DateFormat.yMMMd().format(project.startDate),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondaryDarkColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Capacity
+                    LinearProgressIndicator(
+                      value: project.maxVolunteers > 0
+                          ? project.currentVolunteers / project.maxVolunteers
+                          : 0,
+                      backgroundColor: Colors.grey[700],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        project.isAtCapacity
+                            ? Colors.red
+                            : AppTheme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${project.currentVolunteers}/${project.maxVolunteers} volunteers',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: project.isAtCapacity
+                            ? Colors.red
+                            : AppTheme.textSecondaryDarkColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }

@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/usr/local/var/webdav/stbf/serve_to_be_free/main/logs/.7527473815705c33fa7961c6d71f526e55cc63d3-audit.json",
+    "files": [
+        {
+            "date": 1762925391575,
+            "name": "/usr/local/var/webdav/stbf/serve_to_be_free/main/logs/mcp-puppeteer-2025-11-11.log",
+            "hash": "724dcad468953586afaa53f9afa80051314ab7bd100583ff368a1fbd746f56eb"
+        },
+        {
+            "date": 1763169379292,
+            "name": "/usr/local/var/webdav/stbf/serve_to_be_free/main/logs/mcp-puppeteer-2025-11-14.log",
+            "hash": "72ba8201a40a62dd78849c70a2d5442dd8b3d81bb7cd4ef86de88de46f6d443c"
+        }
+    ],
+    "hashType": "sha256"
+}

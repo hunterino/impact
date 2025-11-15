@@ -1,0 +1,273 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:serve_to_be_free/core/services/mqtt_service.dart';
+import 'package:serve_to_be_free/core/services/supabase_service.dart';
+import 'package:serve_to_be_free/core/services/hybrid_data_service.dart';
+import 'package:serve_to_be_free/core/services/offline_service.dart';
+import 'package:serve_to_be_free/core/services/user_service.dart';
+import 'package:serve_to_be_free/core/services/project_service.dart';
+import 'package:serve_to_be_free/core/constants/mqtt_topics.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+void main() {
+  group('MQTT + Supabase Integration Tests', () {
+    setUpAll(() async {
+      // Initialize Hive for testing
+      TestWidgetsFlutterBinding.ensureInitialized();
+      await Hive.initFlutter();
+    });
+
+    group('Service Initialization', () {
+      test('Should create MqttService instance', () {
+        final mqttService = MqttService();
+        expect(mqttService, isNotNull);
+        expect(mqttService.clientId, startsWith('stbf_app_'));
+      });
+
+      test('Should create OfflineService instance', () async {
+        final offlineService = OfflineService();
+        expect(offlineService, isNotNull);
+        expect(offlineService.isOnline, isTrue);
+        expect(offlineService.queueSize, equals(0));
+      });
+
+      test('Should create HybridDataService with dependencies', () {
+        final mqttService = MqttService();
+        final offlineService = OfflineService();
+
+        final hybridDataService = HybridDataService(
+          mqttService: mqttService,
+          supabaseService: SupabaseService.instance,
+          offlineService: offlineService,
+        );
+
+        expect(hybridDataService, isNotNull);
+        expect(hybridDataService.events, isNotNull);
+      });
+
+      test('Should create UserService with hybrid approach', () {
+        final mqttService = MqttService();
+        final offlineService = OfflineService();
+        final hybridDataService = HybridDataService(
+          mqttService: mqttService,
+          supabaseService: SupabaseService.instance,
+          offlineService: offlineService,
+        );
+
+        final userService = UserService(
+          mqttService: mqttService,
+          hybridDataService: hybridDataService,
+          offlineService: offlineService,
+        );
+
+        expect(userService, isNotNull);
+        expect(userService.userUpdates, isNotNull);
+      });
+
+      test('Should create ProjectService with hybrid approach', () {
+        final mqttService = MqttService();
+        final offlineService = OfflineService();
+        final hybridDataService = HybridDataService(
+          mqttService: mqttService,
+          supabaseService: SupabaseService.instance,
+          offlineService: offlineService,
+        );
+
+        final projectService = ProjectService(
+          mqttService: mqttService,
+          hybridDataService: hybridDataService,
+          offlineService: offlineService,
+        );
+
+        expect(projectService, isNotNull);
+        expect(projectService.projectUpdates, isNotNull);
+      });
+    });
+
+    group('MQTT Topics', () {
+      test('Should have correct topic structure', () {
+        expect(MqttTopics.namespace, equals('stbf'));
+        expect(MqttTopics.authRequest, equals('stbf/auth/request'));
+        expect(MqttTopics.authResponse, equals('stbf/auth/response'));
+        expect(MqttTopics.authRealtime, equals('stbf/auth/realtime'));
+
+        expect(MqttTopics.userRequest, equals('stbf/user/request'));
+        expect(MqttTopics.userResponse, equals('stbf/user/response'));
+        expect(MqttTopics.userRealtime, equals('stbf/user/realtime'));
+
+        expect(MqttTopics.projectRequest, equals('stbf/project/request'));
+        expect(MqttTopics.projectResponse, equals('stbf/project/response'));
+        expect(MqttTopics.projectRealtime, equals('stbf/project/realtime'));
+      });
+
+      test('Should generate dynamic topics correctly', () {
+        final userId = 'user-123';
+        expect(MqttTopics.userNotifications(userId), equals('stbf/notifications/user-123'));
+
+        final teamId = 'team-456';
+        expect(MqttTopics.teamChannel(teamId), equals('stbf/team/team-456/channel'));
+
+        final projectId = 'proj-789';
+        expect(MqttTopics.projectChannel(projectId), equals('stbf/project/proj-789/channel'));
+      });
+
+      test('Should identify STBF topics correctly', () {
+        expect(MqttTopics.isStbfTopic('stbf/auth/request'), isTrue);
+        expect(MqttTopics.isStbfTopic('other/topic'), isFalse);
+
+        expect(MqttTopics.extractFeature('stbf/auth/request'), equals('auth'));
+        expect(MqttTopics.extractAction('stbf/auth/request'), equals('request'));
+      });
+    });
+
+    group('Offline Service', () {
+      test('Should cache and retrieve data', () async {
+        final offlineService = OfflineService();
+        await offlineService.initialize();
+
+        // Cache some data
+        final testData = {'id': '123', 'name': 'Test'};
+        await offlineService.cacheData('test_key', testData);
+
+        // Retrieve cached data
+        final retrieved = offlineService.getCachedData<Map>('test_key');
+        expect(retrieved, isNotNull);
+        expect(retrieved!['id'], equals('123'));
+        expect(retrieved['name'], equals('Test'));
+      });
+
+      test('Should queue operations when offline', () async {
+        final offlineService = OfflineService();
+        await offlineService.initialize();
+
+        // Queue an operation
+        final operationId = await offlineService.queueOperation(
+          'create',
+          {'table': 'projects', 'data': {'title': 'Test Project'}},
+          priority: 1,
+        );
+
+        expect(operationId, isNotNull);
+        expect(offlineService.queueSize, equals(1));
+        expect(offlineService.pendingOperationsCount, equals(1));
+
+        // Get pending operations
+        final pending = await offlineService.getPendingOperations();
+        expect(pending.length, equals(1));
+        expect(pending[0]['operation'], equals('create'));
+      });
+
+      test('Should provide cache statistics', () async {
+        final offlineService = OfflineService();
+        await offlineService.initialize();
+
+        // Add some cache entries
+        await offlineService.cacheData('key1', {'data': 'value1'});
+        await offlineService.cacheData('key2', {'data': 'value2'});
+
+        final stats = offlineService.getCacheStats();
+        expect(stats['totalEntries'], greaterThan(0));
+        expect(stats['isOnline'], isNotNull);
+      });
+    });
+
+    group('HybridEvent Types', () {
+      test('Should create hybrid events correctly', () {
+        final event = HybridEvent(
+          type: HybridEventType.created,
+          table: 'projects',
+          data: {'id': '123', 'title': 'New Project'},
+        );
+
+        expect(event.type, equals(HybridEventType.created));
+        expect(event.table, equals('projects'));
+        expect(event.data['id'], equals('123'));
+        expect(event.timestamp, isNotNull);
+      });
+    });
+
+    group('Service Streams', () {
+      test('UserService should emit updates through stream', () async {
+        final mqttService = MqttService();
+        final offlineService = OfflineService();
+        await offlineService.initialize();
+
+        final userService = UserService(
+          mqttService: mqttService,
+          offlineService: offlineService,
+        );
+
+        // Listen to user updates
+        final updates = <Map<String, dynamic>>[];
+        userService.userUpdates.listen((update) {
+          updates.add(update);
+        });
+
+        // Verify stream is active
+        expect(userService.userUpdates, isNotNull);
+        expect(userService.userUpdates.isBroadcast, isTrue);
+      });
+
+      test('ProjectService should emit updates through stream', () async {
+        final mqttService = MqttService();
+        final offlineService = OfflineService();
+        await offlineService.initialize();
+
+        final projectService = ProjectService(
+          mqttService: mqttService,
+          offlineService: offlineService,
+        );
+
+        // Listen to project updates
+        final updates = <Map<String, dynamic>>[];
+        projectService.projectUpdates.listen((update) {
+          updates.add(update);
+        });
+
+        // Verify stream is active
+        expect(projectService.projectUpdates, isNotNull);
+        expect(projectService.projectUpdates.isBroadcast, isTrue);
+      });
+    });
+
+    group('Cache Management', () {
+      test('Should clear cache by pattern', () async {
+        final offlineService = OfflineService();
+        await offlineService.initialize();
+
+        // Add multiple cache entries
+        await offlineService.cacheData('user_profile_123', {'name': 'User 1'});
+        await offlineService.cacheData('user_profile_456', {'name': 'User 2'});
+        await offlineService.cacheData('featured_projects', [{'id': '1'}]);
+
+        // Clear user profile caches
+        await offlineService.clearCache(pattern: 'user_profile');
+
+        // Verify specific pattern was cleared
+        expect(offlineService.getCachedData('user_profile_123'), isNull);
+        expect(offlineService.getCachedData('user_profile_456'), isNull);
+        expect(offlineService.getCachedData('featured_projects'), isNotNull);
+      });
+
+      test('Should respect cache expiration', () async {
+        final offlineService = OfflineService();
+        await offlineService.initialize();
+
+        // Cache data with short expiration
+        await offlineService.cacheData(
+          'temp_data',
+          {'value': 'test'},
+          expiration: Duration(milliseconds: 100),
+        );
+
+        // Verify data exists immediately
+        expect(offlineService.getCachedData('temp_data'), isNotNull);
+
+        // Wait for expiration
+        await Future.delayed(Duration(milliseconds: 150));
+
+        // Verify data expired
+        expect(offlineService.getCachedData('temp_data'), isNull);
+      });
+    });
+  });
+}

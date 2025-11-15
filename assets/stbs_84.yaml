@@ -1,0 +1,780 @@
+lib/main.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:serve_to_be_free/core/services/mqtt_service.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/services/user_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/auth/auth_wrapper.dart';
+  import 'package:hive_flutter/hive_flutter.dart';
+  
+  void main() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    // Initialize Hive for local storage
+    await Hive.initFlutter();
+    
+    // Initialize services
+    final mqttService = MqttService();
+    await mqttService.initialize();
+    
+    final authService = AuthService(mqttService);
+    final userService = UserService(mqttService);
+    
+    runApp(MyApp(
+      mqttService: mqttService,
+      authService: authService,
+      userService: userService,
+    ));
+  }
+  
+  class MyApp extends StatelessWidget {
+    final MqttService mqttService;
+    final AuthService authService;
+    final UserService userService;
+    
+    const MyApp({
+      Key? key,
+      required this.mqttService,
+      required this.authService,
+      required this.userService,
+    }) : super(key: key);
+  
+    @override
+    Widget build(BuildContext context) {
+      return MultiProvider(
+        providers: [
+          Provider<MqttService>.value(value: mqttService),
+          Provider<AuthService>.value(value: authService),
+          Provider<UserService>.value(value: userService),
+          ChangeNotifierProvider(
+            create: (_) => AuthProvider(authService),
+          ),
+          ChangeNotifierProxyProvider<AuthProvider, UserProvider>(
+            create: (context) => UserProvider(
+              userService,
+              context.read<AuthProvider>(),
+            ),
+            update: (context, auth, previous) => 
+              UserProvider(userService, auth, previous?.user),
+          ),
+        ],
+        child: MaterialApp(
+          title: 'Serve To Be Free',
+          theme: AppTheme.darkTheme,
+          home: const AuthWrapper(),
+          debugShowCheckedModeBanner: false,
+        ),
+      );
+    }
+  }
+
+lib/core/theme/app_theme.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:google_fonts/google_fonts.dart';
+  
+  class AppTheme {
+    // Primary colors
+    static const Color primaryColor = Color(0xFF4A7AFF);
+    static const Color primaryColorLight = Color(0xFF91B4FF);
+    static const Color primaryColorDark = Color(0xFF1E56CC);
+    
+    // Secondary colors
+    static const Color secondaryColor = Color(0xFF52C41A);
+    static const Color secondaryColorLight = Color(0xFF8AE354);
+    static const Color secondaryColorDark = Color(0xFF2B8000);
+    
+    // Accent colors
+    static const Color accentColor = Color(0xFFFA8C16);
+    
+    // Background colors
+    static const Color scaffoldDarkColor = Color(0xFF121212);
+    static const Color cardDarkColor = Color(0xFF1E1E1E);
+    static const Color surfaceDarkColor = Color(0xFF252525);
+    
+    // Text colors
+    static const Color textPrimaryDarkColor = Color(0xFFFFFFFF);
+    static const Color textSecondaryDarkColor = Color(0xFFB3B3B3);
+    static const Color textDisabledDarkColor = Color(0xFF757575);
+    
+    // Error color
+    static const Color errorColor = Color(0xFFF5222D);
+    
+    // Status colors
+    static const Color successColor = Color(0xFF52C41A);
+    static const Color warningColor = Color(0xFFFADB14);
+    static const Color infoColor = Color(0xFF1890FF);
+    
+    static final ThemeData darkTheme = ThemeData(
+      useMaterial3: true,
+      colorScheme: const ColorScheme.dark(
+        primary: primaryColor,
+        onPrimary: Colors.white,
+        primaryContainer: primaryColorDark,
+        onPrimaryContainer: Colors.white,
+        secondary: secondaryColor,
+        onSecondary: Colors.white,
+        secondaryContainer: secondaryColorDark,
+        onSecondaryContainer: Colors.white,
+        tertiary: accentColor,
+        onTertiary: Colors.white,
+        error: errorColor,
+        onError: Colors.white,
+        background: scaffoldDarkColor,
+        onBackground: textPrimaryDarkColor,
+        surface: cardDarkColor,
+        onSurface: textPrimaryDarkColor,
+      ),
+      scaffoldBackgroundColor: scaffoldDarkColor,
+      cardColor: cardDarkColor,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: cardDarkColor,
+        foregroundColor: textPrimaryDarkColor,
+        elevation: 0,
+      ),
+      textTheme: GoogleFonts.interTextTheme(TextTheme(
+        displayLarge: TextStyle(color: textPrimaryDarkColor),
+        displayMedium: TextStyle(color: textPrimaryDarkColor),
+        displaySmall: TextStyle(color: textPrimaryDarkColor),
+        headlineLarge: TextStyle(color: textPrimaryDarkColor),
+        headlineMedium: TextStyle(color: textPrimaryDarkColor),
+        headlineSmall: TextStyle(color: textPrimaryDarkColor),
+        titleLarge: TextStyle(color: textPrimaryDarkColor),
+        titleMedium: TextStyle(color: textPrimaryDarkColor),
+        titleSmall: TextStyle(color: textPrimaryDarkColor),
+        bodyLarge: TextStyle(color: textPrimaryDarkColor),
+        bodyMedium: TextStyle(color: textPrimaryDarkColor),
+        bodySmall: TextStyle(color: textSecondaryDarkColor),
+        labelLarge: TextStyle(color: textPrimaryDarkColor),
+        labelMedium: TextStyle(color: textPrimaryDarkColor),
+        labelSmall: TextStyle(color: textSecondaryDarkColor),
+      )),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: primaryColor, width: 1.5),
+          foregroundColor: primaryColor,
+          minimumSize: const Size(double.infinity, 56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: primaryColor,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceDarkColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.0),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.0),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.0),
+          borderSide: const BorderSide(color: primaryColor, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.0),
+          borderSide: const BorderSide(color: errorColor, width: 1.5),
+        ),
+        labelStyle: const TextStyle(color: textSecondaryDarkColor),
+        hintStyle: const TextStyle(color: textDisabledDarkColor),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: cardDarkColor,
+        selectedItemColor: primaryColor,
+        unselectedItemColor: textSecondaryDarkColor,
+        type: BottomNavigationBarType.fixed,
+      ),
+      dividerColor: Colors.white.withOpacity(0.1),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: MaterialStateProperty.resolveWith((states) {
+          if (states.contains(MaterialState.selected)) {
+            return primaryColor;
+          }
+          return Colors.transparent;
+        }),
+        side: const BorderSide(color: textSecondaryDarkColor),
+      ),
+    );
+  }
+
+lib/core/services/mqtt_service.dart: |
+  import 'dart:async';
+  import 'dart:convert';
+  import 'package:flutter/foundation.dart';
+  import 'package:mqtt_client/mqtt_client.dart';
+  import 'package:mqtt_client/mqtt_server_client.dart';
+  import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+  import 'package:uuid/uuid.dart';
+  import 'package:logging/logging.dart';
+  
+  class MqttService {
+    // Logger for debug information
+    final Logger _logger = Logger('MqttService');
+    
+    // MQTT Client instance
+    late MqttServerClient _client;
+    
+    // Secure storage for credentials
+    final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+    
+    // Connection status
+    bool _isConnected = false;
+    bool get isConnected => _isConnected;
+    
+    // Stream controllers for message events
+    final StreamController<Map<String, dynamic>> _messageStreamController = 
+        StreamController<Map<String, dynamic>>.broadcast();
+    Stream<Map<String, dynamic>> get messageStream => _messageStreamController.stream;
+    
+    // Topic mapping to track subscriptions and responses
+    final Map<String, Completer<Map<String, dynamic>>> _pendingRequests = {};
+    
+    // Client identifier
+    final String _clientId = 'stbf_app_${const Uuid().v4()}';
+    
+    // Initialize the MQTT client
+    Future<void> initialize() async {
+      try {
+        // Get stored connection settings
+        final host = await _secureStorage.read(key: 'mqtt_host') ?? '5x-platform-mqtt-host';
+        final port = int.parse(await _secureStorage.read(key: 'mqtt_port') ?? '1883');
+        
+        // Initialize client
+        _client = MqttServerClient(host, _clientId)
+          ..port = port
+          ..keepAlivePeriod = 60
+          ..autoReconnect = true
+          ..onConnected = _onConnected
+          ..onDisconnected = _onDisconnected
+          ..onSubscribed = _onSubscribed
+          ..onSubscribeFail = _onSubscribeFail
+          ..pongCallback = _pong;
+        
+        // Set secure connection if not in debug mode
+        if (!kDebugMode) {
+          _client.secure = true;
+        }
+        
+        _client.logging(on: kDebugMode);
+        
+        // Set up message handler
+        _client.updates?.listen(_onMessage);
+        
+        // Try initial connection
+        await _connect();
+      } catch (e) {
+        _logger.severe('Failed to initialize MQTT service: $e');
+      }
+    }
+    
+    // Connect to MQTT broker
+    Future<bool> _connect() async {
+      try {
+        final username = await _secureStorage.read(key: 'mqtt_username');
+        final password = await _secureStorage.read(key: 'mqtt_password');
+        
+        final connMessage = MqttConnectMessage()
+          ..withClientIdentifier(_clientId)
+          ..withWillTopic('willTopic')
+          ..withWillMessage('Disconnected unexpectedly')
+          ..withWillQos(MqttQos.atLeastOnce)
+          ..withWillRetain()
+          ..startClean();
+        
+        _client.connectionMessage = connMessage;
+        
+        if (username != null && password != null) {
+          _client.connectionMessage?.authenticateAs(username, password);
+        }
+        
+        await _client.connect();
+        return _isConnected;
+      } catch (e) {
+        _logger.severe('Connection failed: $e');
+        _isConnected = false;
+        return false;
+      }
+    }
+    
+    // Reconnect if connection is lost
+    Future<bool> reconnect() async {
+      if (_client.connectionStatus?.state == MqttConnectionState.connected) {
+        return true;
+      }
+      
+      try {
+        await _client.connect();
+        return _isConnected;
+      } catch (e) {
+        _logger.severe('Reconnection failed: $e');
+        return false;
+      }
+    }
+    
+    // Subscribe to a topic
+    Future<bool> subscribe(String topic, {int qos = 1}) async {
+      if (!_isConnected && !await reconnect()) {
+        return false;
+      }
+      
+      try {
+        _client.subscribe(topic, MqttQos.values[qos]);
+        return true;
+      } catch (e) {
+        _logger.severe('Failed to subscribe to $topic: $e');
+        return false;
+      }
+    }
+    
+    // Publish a message to a topic
+    Future<bool> publish(String topic, Map<String, dynamic> message, {int qos = 1}) async {
+      if (!_isConnected && !await reconnect()) {
+        return false;
+      }
+      
+      try {
+        final payload = utf8.encode(json.encode(message));
+        _client.publishMessage(
+          topic, 
+          MqttQos.values[qos], 
+          MqttClientPayloadBuilder().addUTF8String(json.encode(message)).payload!,
+          retain: false
+        );
+        return true;
+      } catch (e) {
+        _logger.severe('Failed to publish to $topic: $e');
+        return false;
+      }
+    }
+    
+    // Request-response pattern with timeout
+    Future<Map<String, dynamic>> request(
+      String requestTopic, 
+      String responseTopic, 
+      Map<String, dynamic> message, 
+      {Duration timeout = const Duration(seconds: 30)}
+    ) async {
+      if (!_isConnected && !await reconnect()) {
+        throw Exception('Not connected to MQTT broker');
+      }
+      
+      // Generate a unique request ID
+      final requestId = const Uuid().v4();
+      message['requestId'] = requestId;
+      
+      // Subscribe to response topic if not already subscribed
+      await subscribe(responseTopic);
+      
+      // Create a completer to handle the async response
+      final completer = Completer<Map<String, dynamic>>();
+      _pendingRequests[requestId] = completer;
+      
+      // Publish the request
+      await publish(requestTopic, message);
+      
+      // Set up timeout
+      Timer(timeout, () {
+        if (!completer.isCompleted) {
+          _pendingRequests.remove(requestId);
+          completer.completeError(
+            Exception('Request timed out after ${timeout.inSeconds} seconds')
+          );
+        }
+      });
+      
+      // Wait for response
+      return completer.future;
+    }
+    
+    // Disconnect from the broker
+    Future<void> disconnect() async {
+      _client.disconnect();
+    }
+    
+    // Connection callback
+    void _onConnected() {
+      _isConnected = true;
+      _logger.info('Connected to MQTT broker');
+    }
+    
+    // Disconnection callback
+    void _onDisconnected() {
+      _isConnected = false;
+      _logger.warning('Disconnected from MQTT broker');
+    }
+    
+    // Subscription callback
+    void _onSubscribed(String topic) {
+      _logger.info('Subscribed to topic: $topic');
+    }
+    
+    // Subscription failure callback
+    void _onSubscribeFail(String topic) {
+      _logger.severe('Failed to subscribe to topic: $topic');
+    }
+    
+    // Ping response callback
+    void _pong() {
+      _logger.fine('Ping response received');
+    }
+    
+    // Message handler
+    void _onMessage(List<MqttReceivedMessage<MqttMessage>> messages) {
+      for (var message in messages) {
+        final recMess = message.payload as MqttPublishMessage;
+        final payload = utf8.decode(recMess.payload.message);
+        
+        try {
+          final data = json.decode(payload) as Map<String, dynamic>;
+          
+          // Check if this is a response to a pending request
+          if (data.containsKey('requestId') && _pendingRequests.containsKey(data['requestId'])) {
+            final completer = _pendingRequests.remove(data['requestId'])!;
+            completer.complete(data);
+          } else {
+            // Broadcast message to all listeners
+            _messageStreamController.add(data);
+          }
+        } catch (e) {
+          _logger.warning('Failed to parse message: $e');
+        }
+      }
+    }
+    
+    // Dispose resources
+    void dispose() {
+      _client.disconnect();
+      _messageStreamController.close();
+    }
+  }
+
+lib/core/services/auth_service.dart: |
+  import 'dart:async';
+  import 'dart:convert';
+  import 'package:flutter/foundation.dart';
+  import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+  import 'package:serve_to_be_free/core/services/mqtt_service.dart';
+  import 'package:serve_to_be_free/features/auth/models/user_model.dart';
+  
+  class AuthService {
+    final MqttService _mqttService;
+    final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+    
+    // MQTT Topics
+    static const String _authRequestTopic = 'stbf/auth/request';
+    static const String _authResponseTopic = 'stbf/auth/response';
+    static const String _registerRequestTopic = 'stbf/register/request';
+    static const String _registerResponseTopic = 'stbf/register/response';
+    
+    UserModel? _currentUser;
+    UserModel? get currentUser => _currentUser;
+    
+    // Stream controllers
+    final StreamController<UserModel?> _authStateController = 
+        StreamController<UserModel?>.broadcast();
+    Stream<UserModel?> get authStateChanges => _authStateController.stream;
+    
+    AuthService(this._mqttService) {
+      _init();
+    }
+    
+    Future<void> _init() async {
+      // Subscribe to auth response topic
+      await _mqttService.subscribe(_authResponseTopic);
+      await _mqttService.subscribe(_registerResponseTopic);
+      
+      // Check for stored token and try to auto-login
+      final token = await _secureStorage.read(key: 'auth_token');
+      if (token != null) {
+        try {
+          await validateToken(token);
+        } catch (e) {
+          // Token is invalid, clear it
+          await _secureStorage.delete(key: 'auth_token');
+        }
+      }
+    }
+    
+    // Login with email and password
+    Future<UserModel> loginWithEmailAndPassword(String email, String password) async {
+      try {
+        final response = await _mqttService.request(
+          _authRequestTopic,
+          _authResponseTopic,
+          {
+            'action': 'login',
+            'email': email,
+            'password': password,
+          }
+        );
+        
+        if (response['status'] == 'success') {
+          final user = UserModel.fromJson(response['user']);
+          final token = response['token'];
+          
+          // Store the token securely
+          await _secureStorage.write(key: 'auth_token', value: token);
+          
+          // Update current user and notify listeners
+          _currentUser = user;
+          _authStateController.add(_currentUser);
+          
+          return user;
+        } else {
+          throw Exception(response['message'] ?? 'Authentication failed');
+        }
+      } catch (e) {
+        throw Exception('Authentication failed: $e');
+      }
+    }
+    
+    // Register a new user
+    Future<UserModel> register({
+      required String email,
+      required String password,
+      required String firstName,
+      required String lastName,
+      String? phoneNumber,
+      String? location,
+    }) async {
+      try {
+        final response = await _mqttService.request(
+          _registerRequestTopic,
+          _registerResponseTopic,
+          {
+            'action': 'register',
+            'email': email,
+            'password': password,
+            'firstName': firstName,
+            'lastName': lastName,
+            'phoneNumber': phoneNumber,
+            'location': location,
+          }
+        );
+        
+        if (response['status'] == 'success') {
+          final user = UserModel.fromJson(response['user']);
+          final token = response['token'];
+          
+          // Store the token securely
+          await _secureStorage.write(key: 'auth_token', value: token);
+          
+          // Update current user and notify listeners
+          _currentUser = user;
+          _authStateController.add(_currentUser);
+          
+          return user;
+        } else {
+          throw Exception(response['message'] ?? 'Registration failed');
+        }
+      } catch (e) {
+        throw Exception('Registration failed: $e');
+      }
+    }
+    
+    // Login with social media
+    Future<UserModel> loginWithSocialMedia(String provider) async {
+      try {
+        final response = await _mqttService.request(
+          _authRequestTopic,
+          _authResponseTopic,
+          {
+            'action': 'social_login',
+            'provider': provider,
+          }
+        );
+        
+        if (response['status'] == 'success') {
+          final user = UserModel.fromJson(response['user']);
+          final token = response['token'];
+          
+          // Store the token securely
+          await _secureStorage.write(key: 'auth_token', value: token);
+          
+          // Update current user and notify listeners
+          _currentUser = user;
+          _authStateController.add(_currentUser);
+          
+          return user;
+        } else {
+          throw Exception(response['message'] ?? 'Authentication failed');
+        }
+      } catch (e) {
+        throw Exception('Authentication failed: $e');
+      }
+    }
+    
+    // Validate token and get user data
+    Future<UserModel> validateToken(String token) async {
+      try {
+        final response = await _mqttService.request(
+          _authRequestTopic,
+          _authResponseTopic,
+          {
+            'action': 'validate_token',
+            'token': token,
+          }
+        );
+        
+        if (response['status'] == 'success') {
+          final user = UserModel.fromJson(response['user']);
+          
+          // Update current user and notify listeners
+          _currentUser = user;
+          _authStateController.add(_currentUser);
+          
+          return user;
+        } else {
+          throw Exception(response['message'] ?? 'Token validation failed');
+        }
+      } catch (e) {
+        throw Exception('Token validation failed: $e');
+      }
+    }
+    
+    // Logout the current user
+    Future<void> logout() async {
+      try {
+        await _mqttService.request(
+          _authRequestTopic,
+          _authResponseTopic,
+          {
+            'action': 'logout',
+            'token': await _secureStorage.read(key: 'auth_token'),
+          }
+        );
+      } catch (e) {
+        // Continue with logout even if the request fails
+        if (kDebugMode) {
+          print('Logout request failed: $e');
+        }
+      } finally {
+        // Clear the stored token
+        await _secureStorage.delete(key: 'auth_token');
+        
+        // Update current user and notify listeners
+        _currentUser = null;
+        _authStateController.add(null);
+      }
+    }
+    
+    // Reset password
+    Future<bool> resetPassword(String email) async {
+      try {
+        final response = await _mqttService.request(
+          _authRequestTopic,
+          _authResponseTopic,
+          {
+            'action': 'reset_password',
+            'email': email,
+          }
+        );
+        
+        return response['status'] == 'success';
+      } catch (e) {
+        throw Exception('Password reset failed: $e');
+      }
+    }
+    
+    // Update password
+    Future<bool> updatePassword(String currentPassword, String newPassword) async {
+      try {
+        final response = await _mqttService.request(
+          _authRequestTopic,
+          _authResponseTopic,
+          {
+            'action': 'update_password',
+            'token': await _secureStorage.read(key: 'auth_token'),
+            'current_password': currentPassword,
+            'new_password': newPassword,
+          }
+        );
+        
+        return response['status'] == 'success';
+      } catch (e) {
+        throw Exception('Password update failed: $e');
+      }
+    }
+    
+    // Dispose resources
+    void dispose() {
+      _authStateController.close();
+    }
+  }
+  
+  class AuthProvider with ChangeNotifier {
+    final AuthService _authService;
+    
+    UserModel? get user => _authService.currentUser;
+    bool get isAuthenticated => user != null;
+    
+    AuthProvider(this._authService) {
+      _authService.authStateChanges.listen((_) {
+        notifyListeners();
+      });
+    }
+    
+    Future<UserModel> login(String email, String password) async {
+      final user = await _authService.loginWithEmailAndPassword(email, password);
+      notifyListeners();
+      return user;
+    }
+    
+    Future<UserModel> register({
+      required String email,
+      required String password,
+      required String firstName,
+      required String lastName,
+      String? phoneNumber,
+      String? location,
+    }) async {
+      final user = await _authService.register(
+        email: email,
+        password: password,
+        firstName: firstName,
+        lastName: lastName,
+        phoneNumber: phoneNumber,
+        location: location,
+      );
+      notifyListeners();
+      return user;
+    }
+    
+    Future<UserModel> loginWithSocial(String provider) async {
+      final user = await _authService.loginWithSocialMedia(provider);
+      notifyListeners();
+      return user;
+    }
+    
+    Future<void> logout() async {
+      await _authService.logout();
+      notifyListeners();
+    }
+    
+    Future<bool> resetPassword(String email) async {
+      return await _authService.resetPassword(email);
+    }
+    
+    Future<bool> updatePassword(String currentPassword, String newPassword) async {
+      return await _authService.updatePassword(currentPassword, newPassword);
+    }
+  }

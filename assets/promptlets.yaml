@@ -1,0 +1,137 @@
+---
+- id: generate_flutter_ui
+  description: Generate Flutter ui
+  actor: Acting as a exceptional software development team.
+  interaction: ask questions one at a time, as necessary to determine the approach.
+  prompt: |
+    for each modules output, use a yaml format, with the key as the path and the value as the file content.  
+    usesing this approach, generate each module 1 at a time, asking to generate the next module.
+    code in flutter, using the following libraries: ${flutter_libs}
+
+- id: flutter_libs
+  description: Specific Libraries to include
+  prompt:
+
+- id: generate_flutter_ui
+  description: Generate Flutter ui
+  prompt: |
+    Review the requirements, define the modules that the system needs to create, and then using the appropriate wireframe.
+    Generate the flutter code, to implement the modules, one at a time, asking to build the next module.  
+    Use the forge_ui framework as defined below, and me questions one at a time to determine approach, and select libraries for flutter as necessary.
+
+- id: wireframes
+  description: Generate Wireframes
+  actor: Acting as a exceptional software development team.
+  interaction: ask questions one at a time, as necessary to determine the approach.
+  prompt: |
+    Generate svg wireframes for each module.
+    for each modules output, use a yaml format, with the key as the path and the value as the file content.  
+    usesing this approach, generate each module 1 at a time, asking to generate the next module.
+    code in flutter, using the following libraries: ${flutter_libs}
+
+- id: marketing_strategy
+  description: Marketing Strategy
+  actor: acting as an exceptional marketing team
+  interaction: ask questions one at a time, as necessary to determine the approach.
+  prompt: |
+    outline a marketing strategy for the project, including the following:
+    * Ideal Customer Profile
+    * Marketing Slide Deck
+
+- id: uber_generator
+  description: Uber Generator
+  actor:
+  interaction:
+  prompt: |
+    Generate a marketing strategy for the project, including the following:
+    - Ideal Customer Profile
+    - Marketing Slide Deck
+
+    - Business Model Canvas: based on the context, generate a business model canvas for the project, additionally add appropriate financial information, 
+
+    - Flutter Library Specs
+    - Flutter Library Dependencies
+    - Code Generation
+    - Technical requirements
+    - User Stories
+    - User Manual Documentation
+    - Unit tests
+
+- id: ideal_customer_profile
+  description: Ideal Customer Profile
+  actor:
+  interaction:
+  prompt:
+
+- id: code_generation
+  description: Code Generation
+  actor:
+  interaction:
+  prompt:
+
+- id: requirements
+  description: Requirements
+  actor:
+  interaction:
+  prompt:
+
+- id: technical_requirements
+  description: Technical requirements
+  actor:
+  interaction:
+  prompt:
+
+- id: user_stories
+  description: User Stories
+  actor:
+  interaction:
+  prompt:
+
+- id: user_manual
+  description: User Manual
+  actor:
+  interaction:
+  prompt:
+
+- id: developers_guide
+  description: Developers Guide
+  actor:
+  interaction:
+  prompt:
+
+- id: unit_tests
+  description: Unit tests
+  actor:
+  interaction:
+  prompt:
+
+- id: marketing_slide_deck
+  description: Marketing Slide Deck
+  actor:
+  interaction:
+  prompt:
+
+- id: code_implementation
+  description: Code Implementation
+  actor:
+  interaction:
+  prompt:
+
+- id: Business Model Canvas
+  description: Business Model Canvas
+  actor:
+  interaction:
+  prompt: |
+    based on the context, generate a business model canvas for the project, additionally add appropriate financial information, 
+
+- id: flutter_library_specs
+  description: Flutter Library Specs
+  actor:
+  interaction:
+  prompt:
+
+- id: flutter_library_dependencies
+  description: Flutter Library Dependencies
+  actor:
+  interaction:
+  prompt:

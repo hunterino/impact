@@ -1,0 +1,671 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:serve_to_be_free/core/services/mqtt_service.dart';
+import 'package:serve_to_be_free/features/rewards/models/points_transaction_model.dart';
+import 'package:serve_to_be_free/features/rewards/models/serv_dr_transaction_model.dart';
+import 'package:serve_to_be_free/features/rewards/models/reward_model.dart';
+import 'package:serve_to_be_free/features/rewards/models/redemption_model.dart';
+import 'package:serve_to_be_free/features/rewards/models/wallet_model.dart';
+
+class RewardsService {
+  final MqttService _mqttService;
+  
+  // MQTT Topics
+  static const String _walletRequestTopic = 'stbf/wallet/request';
+  static const String _walletResponseTopic = 'stbf/wallet/response';
+  static const String _rewardsRequestTopic = 'stbf/rewards/request';
+  static const String _rewardsResponseTopic = 'stbf/rewards/response';
+  
+  RewardsService(this._mqttService) {
+    _init();
+  }
+  
+  Future<void> _init() async {
+    // Subscribe to wallet and rewards response topics
+    await _mqttService.subscribe(_walletResponseTopic);
+    await _mqttService.subscribe(_rewardsResponseTopic);
+  }
+  
+  // Get user wallet
+  Future<WalletModel> getUserWallet(String userId) async {
+    try {
+      final response = await _mqttService.request(
+        _walletRequestTopic,
+        _walletResponseTopic,
+        {
+          'action': 'get_wallet',
+          'userId': userId,
+        }
+      );
+      
+      if (response['status'] == 'success') {
+        return WalletModel.fromJson(response['wallet']);
+      } else {
+        throw Exception(response['message'] ?? 'Failed to get wallet');
+      }
+    } catch (e) {
+      throw Exception('Failed to get wallet: $e');
+    }
+  }
+  
+  // Get points transactions
+  Future<List<PointsTransactionModel>> getPointsTransactions(
+    String userId,
+    {int page = 1, int pageSize = 20}
+  ) async {
+    try {
+      final response = await _mqttService.request(
+        _walletRequestTopic,
+        _walletResponseTopic,
+        {
+          'action': 'get_points_transactions',
+          'userId': userId,
+          'page': page,
+          'pageSize': pageSize,
+        }
+      );
+      
+      if (response['status'] == 'success') {
+        final List<dynamic> transactionsJson = response['transactions'];
+        return transactionsJson.map((json) => PointsTransactionModel.fromJson(json)).toList();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to get points transactions');
+      }
+    } catch (e) {
+      throw Exception('Failed to get points transactions: $e');
+    }
+  }
+  
+  // Get SERV DR transactions
+  Future<List<ServDRTransactionModel>> getServDRTransactions(
+    String userId,
+    {int page = 1, int pageSize = 20}
+  ) async {
+    try {
+      final response = await _mqttService.request(
+        _walletRequestTopic,
+        _walletResponseTopic,
+        {
+          'action': 'get_serv_dr_transactions',
+          'userId': userId,
+          'page': page,
+          'pageSize': pageSize,
+        }
+      );
+      
+      if (response['status'] == 'success') {
+        final List<dynamic> transactionsJson = response['transactions'];
+        return transactionsJson.map((json) => ServDRTransactionModel.fromJson(json)).toList();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to get SERV DR transactions');
+      }
+    } catch (e) {
+      throw Exception('Failed to get SERV DR transactions: $e');
+    }
+  }
+  
+  // Convert STBF Points to SERV DR
+  Future<ServDRTransactionModel> convertPointsToServDR(
+    String userId,
+    int pointsAmount,
+  ) async {
+    try {
+      final response = await _mqttService.request(
+        _walletRequestTopic,
+        _walletResponseTopic,
+        {
+          'action': 'convert_points_to_serv_dr',
+          'userId': userId,
+          'pointsAmount': pointsAmount,
+        }
+      );
+      
+      if (response['status'] == 'success') {
+        return ServDRTransactionModel.fromJson(response['transaction']);
+      } else {
+        throw Exception(response['message'] ?? 'Failed to convert points');
+      }
+    } catch (e) {
+      throw Exception('Failed to convert points: $e');
+    }
+  }
+  
+  // Convert SERV DR to SERV Coin
+  Future<ServDRTransactionModel> convertServDRToServCoin(
+    String userId,
+    double servDRAmount,
+  ) async {
+    try {
+      final response = await _mqttService.request(
+        _walletRequestTopic,
+        _walletResponseTopic,
+        {
+          'action': 'convert_serv_dr_to_serv_coin',
+          'userId': userId,
+          'servDRAmount': servDRAmount,
+        }
+      );
+      
+      if (response['status'] == 'success') {
+        return ServDRTransactionModel.fromJson(response['transaction']);
+      } else {
+        throw Exception(response['message'] ?? 'Failed to convert SERV DR');
+      }
+    } catch (e) {
+      throw Exception('Failed to convert SERV DR: $e');
+    }
+  }
+  
+  // Activate SERV Coin wallet
+  Future<bool> activateServCoinWallet(String userId) async {
+    try {
+      final response = await _mqttService.request(
+        _walletRequestTopic,
+        _walletResponseTopic,
+        {
+          'action': 'activate_serv_coin_wallet',
+          'userId': userId,
+        }
+      );
+      
+      return response['status'] == 'success';
+    } catch (e) {
+      throw Exception('Failed to activate SERV Coin wallet: $e');
+    }
+  }
+  
+  // Get available rewards
+  Future<List<RewardModel>> getAvailableRewards({
+    String? category,
+    double? maxServDRCost,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      final requestData = {
+        'action': 'get_available_rewards',
+        'page': page,
+        'pageSize': pageSize,
+      };
+      
+      if (category != null) {
+        requestData['category'] = category;
+      }
+      
+      if (maxServDRCost != null) {
+        requestData['maxServDRCost'] = maxServDRCost;
+      }
+      
+      final response = await _mqttService.request(
+        _rewardsRequestTopic,
+        _rewardsResponseTopic,
+        requestData
+      );
+      
+      if (response['status'] == 'success') {
+        final List<dynamic> rewardsJson = response['rewards'];
+        return rewardsJson.map((json) => RewardModel.fromJson(json)).toList();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to get rewards');
+      }
+    } catch (e) {
+      throw Exception('Failed to get rewards: $e');
+    }
+  }
+  
+  // Get reward by ID
+  Future<RewardModel> getRewardById(String rewardId) async {
+    try {
+      final response = await _mqttService.request(
+        _rewardsRequestTopic,
+        _rewardsResponseTopic,
+        {
+          'action': 'get_reward',
+          'rewardId': rewardId,
+        }
+      );
+      
+      if (response['status'] == 'success') {
+        return RewardModel.fromJson(response['reward']);
+      } else {
+        throw Exception(response['message'] ?? 'Failed to get reward');
+      }
+    } catch (e) {
+      throw Exception('Failed to get reward: $e');
+    }
+  }
+  
+  // Redeem reward
+  Future<RedemptionModel> redeemReward(
+    String userId,
+    String rewardId,
+  ) async {
+    try {
+      final response = await _mqttService.request(
+        _rewardsRequestTopic,
+        _rewardsResponseTopic,
+        {
+          'action': 'redeem_reward',
+          'userId': userId,
+          'rewardId': rewardId,
+        }
+      );
+      
+      if (response['status'] == 'success') {
+        return RedemptionModel.fromJson(response['redemption']);
+      } else {
+        throw Exception(response['message'] ?? 'Failed to redeem reward');
+      }
+    } catch (e) {
+      throw Exception('Failed to redeem reward: $e');
+    }
+  }
+  
+  // Get user redemptions
+  Future<List<RedemptionModel>> getUserRedemptions(
+    String userId,
+    {String? status, int page = 1, int pageSize = 20}
+  ) async {
+    try {
+      final requestData = {
+        'action': 'get_user_redemptions',
+        'userId': userId,
+        'page': page,
+        'pageSize': pageSize,
+      };
+      
+      if (status != null) {
+        requestData['status'] = status;
+      }
+      
+      final response = await _mqttService.request(
+        _rewardsRequestTopic,
+        _rewardsResponseTopic,
+        requestData
+      );
+      
+      if (response['status'] == 'success') {
+        final List<dynamic> redemptionsJson = response['redemptions'];
+        return redemptionsJson.map((json) => RedemptionModel.fromJson(json)).toList();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to get redemptions');
+      }
+    } catch (e) {
+      throw Exception('Failed to get redemptions: $e');
+    }
+  }
+  
+  // Get redemption details
+  Future<RedemptionModel> getRedemptionById(
+    String userId,
+    String redemptionId,
+  ) async {
+    try {
+      final response = await _mqttService.request(
+        _rewardsRequestTopic,
+        _rewardsResponseTopic,
+        {
+          'action': 'get_redemption',
+          'userId': userId,
+          'redemptionId': redemptionId,
+        }
+      );
+      
+      if (response['status'] == 'success') {
+        return RedemptionModel.fromJson(response['redemption']);
+      } else {
+        throw Exception(response['message'] ?? 'Failed to get redemption');
+      }
+    } catch (e) {
+      throw Exception('Failed to get redemption: $e');
+    }
+  }
+}
+
+class RewardsProvider with ChangeNotifier {
+  final RewardsService _rewardsService;
+  
+  WalletModel? _wallet;
+  List<PointsTransactionModel> _pointsTransactions = [];
+  List<ServDRTransactionModel> _servDRTransactions = [];
+  List<RewardModel> _availableRewards = [];
+  RewardModel? _selectedReward;
+  List<RedemptionModel> _userRedemptions = [];
+  RedemptionModel? _selectedRedemption;
+  
+  bool _isLoading = false;
+  String? _errorMessage;
+  
+  // Getters
+  WalletModel? get wallet => _wallet;
+  List<PointsTransactionModel> get pointsTransactions => _pointsTransactions;
+  List<ServDRTransactionModel> get servDRTransactions => _servDRTransactions;
+  List<RewardModel> get availableRewards => _availableRewards;
+  RewardModel? get selectedReward => _selectedReward;
+  List<RedemptionModel> get userRedemptions => _userRedemptions;
+  RedemptionModel? get selectedRedemption => _selectedRedemption;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+  
+  RewardsProvider(this._rewardsService);
+  
+  // Clear error message
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+  
+  // Fetch user wallet
+  Future<void> fetchUserWallet(String userId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      _wallet = await _rewardsService.getUserWallet(userId);
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+  
+  // Fetch points transactions
+  Future<void> fetchPointsTransactions(
+    String userId,
+    {int page = 1, int pageSize = 20, bool reset = true}
+  ) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      final transactions = await _rewardsService.getPointsTransactions(
+        userId,
+        page: page,
+        pageSize: pageSize,
+      );
+      
+      if (reset) {
+        _pointsTransactions = transactions;
+      } else {
+        _pointsTransactions.addAll(transactions);
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+  
+  // Fetch SERV DR transactions
+  Future<void> fetchServDRTransactions(
+    String userId,
+    {int page = 1, int pageSize = 20, bool reset = true}
+  ) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      final transactions = await _rewardsService.getServDRTransactions(
+        userId,
+        page: page,
+        pageSize: pageSize,
+      );
+      
+      if (reset) {
+        _servDRTransactions = transactions;
+      } else {
+        _servDRTransactions.addAll(transactions);
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+  
+  // Convert points to SERV DR
+  Future<bool> convertPointsToServDR(
+    String userId,
+    int pointsAmount,
+  ) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      final transaction = await _rewardsService.convertPointsToServDR(
+        userId,
+        pointsAmount,
+      );
+      
+      // Update transactions list
+      _servDRTransactions.insert(0, transaction);
+      
+      // Refresh wallet to update balances
+      await fetchUserWallet(userId);
+      
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  // Convert SERV DR to SERV Coin
+  Future<bool> convertServDRToServCoin(
+    String userId,
+    double servDRAmount,
+  ) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      final transaction = await _rewardsService.convertServDRToServCoin(
+        userId,
+        servDRAmount,
+      );
+      
+      // Update transactions list
+      _servDRTransactions.insert(0, transaction);
+      
+      // Refresh wallet to update balances
+      await fetchUserWallet(userId);
+      
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  // Activate SERV Coin wallet
+  Future<bool> activateServCoinWallet(String userId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      final success = await _rewardsService.activateServCoinWallet(userId);
+      
+      if (success) {
+        // Refresh wallet to update status
+        await fetchUserWallet(userId);
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+      return success;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  // Fetch available rewards
+  Future<void> fetchAvailableRewards({
+    String? category,
+    double? maxServDRCost,
+    int page = 1,
+    int pageSize = 20,
+    bool reset = true,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      final rewards = await _rewardsService.getAvailableRewards(
+        category: category,
+        maxServDRCost: maxServDRCost,
+        page: page,
+        pageSize: pageSize,
+      );
+      
+      if (reset) {
+        _availableRewards = rewards;
+      } else {
+        _availableRewards.addAll(rewards);
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+  
+  // Fetch reward details
+  Future<void> fetchRewardDetails(String rewardId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      _selectedReward = await _rewardsService.getRewardById(rewardId);
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+  
+  // Redeem reward
+  Future<RedemptionModel?> redeemReward(
+    String userId,
+    String rewardId,
+  ) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      final redemption = await _rewardsService.redeemReward(
+        userId,
+        rewardId,
+      );
+      
+      // Update redemptions list
+      _userRedemptions.insert(0, redemption);
+      
+      // Refresh wallet to update balances
+      await fetchUserWallet(userId);
+      
+      _isLoading = false;
+      notifyListeners();
+      return redemption;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return null;
+    }
+  }
+  
+  // Fetch user redemptions
+  Future<void> fetchUserRedemptions(
+    String userId,
+    {String? status, int page = 1, int pageSize = 20, bool reset = true}
+  ) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      final redemptions = await _rewardsService.getUserRedemptions(
+        userId,
+        status: status,
+        page: page,
+        pageSize: pageSize,
+      );
+      
+      if (reset) {
+        _userRedemptions = redemptions;
+      } else {
+        _userRedemptions.addAll(redemptions);
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+  
+  // Fetch redemption details
+  Future<void> fetchRedemptionDetails(
+    String userId,
+    String redemptionId,
+  ) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      _selectedRedemption = await _rewardsService.getRedemptionById(
+        userId,
+        redemptionId,
+      );
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+}

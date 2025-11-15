@@ -1,0 +1,686 @@
+lib/features/rewards/screens/rewards_dashboard_screen.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/services/rewards_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/rewards/widgets/wallet_summary_card.dart';
+  import 'package:serve_to_be_free/features/rewards/widgets/reward_category_card.dart';
+  import 'package:serve_to_be_free/features/rewards/screens/points_history_screen.dart';
+  import 'package:serve_to_be_free/features/rewards/screens/serv_dr_history_screen.dart';
+  import 'package:serve_to_be_free/features/rewards/screens/rewards_marketplace_screen.dart';
+  import 'package:serve_to_be_free/features/rewards/screens/my_rewards_screen.dart';
+  import 'package:serve_to_be_free/features/rewards/screens/convert_points_screen.dart';
+  import 'package:serve_to_be_free/features/rewards/screens/convert_serv_dr_screen.dart';
+
+  class RewardsDashboardScreen extends StatefulWidget {
+    const RewardsDashboardScreen({Key? key}) : super(key: key);
+
+    @override
+    State<RewardsDashboardScreen> createState() => _RewardsDashboardScreenState();
+  }
+
+  class _RewardsDashboardScreenState extends State<RewardsDashboardScreen> {
+    @override
+    void initState() {
+      super.initState();
+      _loadData();
+    }
+    
+    Future<void> _loadData() async {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final rewardsProvider = Provider.of<RewardsProvider>(context, listen: false);
+      
+      if (authProvider.user != null) {
+        try {
+          await rewardsProvider.fetchUserWallet(authProvider.user!.id);
+          await rewardsProvider.fetchAvailableRewards(pageSize: 5);
+          await rewardsProvider.fetchUserRedemptions(
+            authProvider.user!.id,
+            status: 'active',
+            pageSize: 5,
+          );
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error loading rewards data: ${e.toString()}'),
+                backgroundColor: AppTheme.errorColor,
+              ),
+            );
+          }
+        }
+      }
+    }
+    
+    Future<void> _refreshData() async {
+      await _loadData();
+    }
+    
+    void _navigateToPointsHistory() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const PointsHistoryScreen(),
+        ),
+      );
+    }
+    
+    void _navigateToServDRHistory() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ServDRHistoryScreen(),
+        ),
+      );
+    }
+    
+    void _navigateToRewardsMarketplace() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const RewardsMarketplaceScreen(),
+        ),
+      );
+    }
+    
+    void _navigateToMyRewards() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MyRewardsScreen(),
+        ),
+      );
+    }
+    
+    void _navigateToConvertPoints() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ConvertPointsScreen(),
+        ),
+      );
+    }
+    
+    void _navigateToConvertServDR() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ConvertServDRScreen(),
+        ),
+      );
+    }
+    
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Rewards'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _refreshData,
+              tooltip: 'Refresh',
+            ),
+          ],
+        ),
+        body: Consumer<RewardsProvider>(
+          builder: (context, rewardsProvider, child) {
+            final wallet = rewardsProvider.wallet;
+            final isLoading = rewardsProvider.isLoading;
+            
+            if (isLoading && wallet == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            
+            return RefreshIndicator(
+              onRefresh: _refreshData,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Wallet Summary
+                    if (wallet != null)
+                      WalletSummaryCard(
+                        wallet: wallet,
+                        onPointsHistoryTap: _navigateToPointsHistory,
+                        onServDRHistoryTap: _navigateToServDRHistory,
+                      ),
+                    const SizedBox(height: 24),
+                    
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _navigateToConvertPoints,
+                            icon: const Icon(Icons.swap_horiz),
+                            label: const Text('Convert Points'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: wallet?.servCoinWalletActivated == true
+                                ? _navigateToConvertServDR
+                                : null,
+                            icon: const Icon(Icons.currency_exchange),
+                            label: const Text('Convert to SERV Coin'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Category Cards
+                    const Text(
+                      'Reward Categories',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    SizedBox(
+                      height: 120,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          RewardCategoryCard(
+                            icon: Icons.shopping_bag,
+                            title: 'Retail',
+                            color: Colors.blue,
+                            onTap: () => _navigateToRewardsMarketplace(),
+                          ),
+                          const SizedBox(width: 12),
+                          RewardCategoryCard(
+                            icon: Icons.restaurant,
+                            title: 'Dining',
+                            color: Colors.orange,
+                            onTap: () => _navigateToRewardsMarketplace(),
+                          ),
+                          const SizedBox(width: 12),
+                          RewardCategoryCard(
+                            icon: Icons.movie,
+                            title: 'Entertainment',
+                            color: Colors.purple,
+                            onTap: () => _navigateToRewardsMarketplace(),
+                          ),
+                          const SizedBox(width: 12),
+                          RewardCategoryCard(
+                            icon: Icons.card_giftcard,
+                            title: 'Gift Cards',
+                            color: Colors.red,
+                            onTap: () => _navigateToRewardsMarketplace(),
+                          ),
+                          const SizedBox(width: 12),
+                          RewardCategoryCard(
+                            icon: Icons.more_horiz,
+                            title: 'More',
+                            color: Colors.green,
+                            onTap: () => _navigateToRewardsMarketplace(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Featured Rewards
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Featured Rewards',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _navigateToRewardsMarketplace,
+                          child: const Text('View All'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    if (rewardsProvider.availableRewards.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text('No featured rewards available'),
+                        ),
+                      )
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: rewardsProvider.availableRewards.length,
+                        itemBuilder: (context, index) {
+                          final reward = rewardsProvider.availableRewards[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.all(12),
+                              leading: reward.imageUrl != null
+                                  ? Image.network(
+                                      reward.imageUrl!,
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Container(
+                                      width: 60,
+                                      height: 60,
+                                      color: Colors.grey[800],
+                                      child: const Icon(
+                                        Icons.card_giftcard,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                              title: Text(reward.title),
+                              subtitle: Text(reward.merchantName),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${reward.servDRCost} SERV DR',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Expires: ${reward.validUntil.day}/${reward.validUntil.month}/${reward.validUntil.year}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[400],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                // Navigate to reward details
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // My Rewards
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'My Rewards',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _navigateToMyRewards,
+                          child: const Text('View All'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    if (rewardsProvider.userRedemptions.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text('No active rewards'),
+                        ),
+                      )
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: rewardsProvider.userRedemptions.length,
+                        itemBuilder: (context, index) {
+                          final redemption = rewardsProvider.userRedemptions[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.all(12),
+                              leading: redemption.rewardImageUrl != null
+                                  ? Image.network(
+                                      redemption.rewardImageUrl!,
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Container(
+                                      width: 60,
+                                      height: 60,
+                                      color: Colors.grey[800],
+                                      child: const Icon(
+                                        Icons.card_giftcard,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                              title: Text(redemption.rewardTitle),
+                              subtitle: Text(redemption.merchantName),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.successColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Text(
+                                      'Active',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.successColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Expires: ${redemption.expiresAt.day}/${redemption.expiresAt.month}/${redemption.expiresAt.year}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[400],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                // Navigate to redemption details
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+  }
+
+lib/features/rewards/screens/points_history_screen.dart: |
+  import 'package:flutter/material.dart';
+  import 'package:provider/provider.dart';
+  import 'package:intl/intl.dart';
+  import 'package:serve_to_be_free/core/services/auth_service.dart';
+  import 'package:serve_to_be_free/core/services/rewards_service.dart';
+  import 'package:serve_to_be_free/core/theme/app_theme.dart';
+  import 'package:serve_to_be_free/features/rewards/widgets/points_transaction_tile.dart';
+
+  class PointsHistoryScreen extends StatefulWidget {
+    const PointsHistoryScreen({Key? key}) : super(key: key);
+
+    @override
+    State<PointsHistoryScreen> createState() => _PointsHistoryScreenState();
+  }
+
+  class _PointsHistoryScreenState extends State<PointsHistoryScreen> {
+    final ScrollController _scrollController = ScrollController();
+    int _currentPage = 1;
+    bool _hasMoreData = true;
+    
+    @override
+    void initState() {
+      super.initState();
+      _loadTransactions();
+      _setupScrollListener();
+    }
+    
+    @override
+    void dispose() {
+      _scrollController.dispose();
+      super.dispose();
+    }
+    
+    void _setupScrollListener() {
+      _scrollController.addListener(() {
+        if (_scrollController.position.pixels >= 
+            _scrollController.position.maxScrollExtent - 200 &&
+            !Provider.of<RewardsProvider>(context, listen: false).isLoading &&
+            _hasMoreData) {
+          _loadMoreTransactions();
+        }
+      });
+    }
+    
+    Future<void> _loadTransactions() async {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final rewardsProvider = Provider.of<RewardsProvider>(context, listen: false);
+      
+      if (authProvider.user != null) {
+        try {
+          await rewardsProvider.fetchPointsTransactions(
+            authProvider.user!.id,
+            page: 1,
+            pageSize: 20,
+            reset: true,
+          );
+          
+          setState(() {
+            _currentPage = 1;
+            _hasMoreData = rewardsProvider.pointsTransactions.length >= 20;
+          });
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading transactions: ${e.toString()}'),
+              backgroundColor: AppTheme.errorColor,
+            ),
+          );
+        }
+      }
+    }
+    
+    Future<void> _loadMoreTransactions() async {
+      if (Provider.of<RewardsProvider>(context, listen: false).isLoading) {
+        return;
+      }
+      
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final rewardsProvider = Provider.of<RewardsProvider>(context, listen: false);
+      
+      if (authProvider.user != null) {
+        try {
+          final nextPage = _currentPage + 1;
+          
+          await rewardsProvider.fetchPointsTransactions(
+            authProvider.user!.id,
+            page: nextPage,
+            pageSize: 20,
+            reset: false,
+          );
+          
+          final transactionsCount = rewardsProvider.pointsTransactions.length;
+          
+          setState(() {
+            _currentPage = nextPage;
+            _hasMoreData = transactionsCount >= nextPage * 20;
+          });
+        } catch (e) {
+          // Error already handled in provider
+        }
+      }
+    }
+    
+    Future<void> _refreshTransactions() async {
+      await _loadTransactions();
+    }
+    
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Points History'),
+        ),
+        body: Consumer<RewardsProvider>(
+          builder: (context, rewardsProvider, child) {
+            final transactions = rewardsProvider.pointsTransactions;
+            final isLoading = rewardsProvider.isLoading;
+            final errorMessage = rewardsProvider.errorMessage;
+            
+            if (isLoading && transactions.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            
+            if (errorMessage != null && transactions.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: AppTheme.errorColor,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error: $errorMessage',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppTheme.errorColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _refreshTransactions,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            if (transactions.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.history,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No transaction history yet',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Earn points by completing service projects',
+                      style: TextStyle(
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            return Column(
+              children: [
+                // Wallet balance card
+                if (rewardsProvider.wallet != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Current Balance',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.textSecondaryDarkColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${rewardsProvider.wallet!.stbfPoints}',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Points expiring soon: ${rewardsProvider.wallet!.stbfPointsExpiringSoon}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: rewardsProvider.wallet!.stbfPointsExpiringSoon > 0
+                                ? AppTheme.warningColor
+                                : AppTheme.textSecondaryDarkColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                
+                // Transactions list
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _refreshTransactions,
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: transactions.length + (isLoading && _hasMoreData ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        // Loading indicator at the bottom
+                        if (index == transactions.length) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+                        
+                        final transaction = transactions[index];
+                        return PointsTransactionTile(transaction: transaction);
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+  }
+
