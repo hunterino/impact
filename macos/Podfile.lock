@@ -4,7 +4,6 @@ PODS:
   - CocoaAsyncSocket (7.6.5)
   - connectivity_plus (0.0.1):
     - FlutterMacOS
-    - ReachabilitySwift
   - file_selector_macos (0.0.1):
     - FlutterMacOS
   - flutter_local_notifications (0.0.1):
@@ -18,6 +17,8 @@ PODS:
   - local_auth_darwin (0.0.1):
     - Flutter
     - FlutterMacOS
+  - package_info_plus (0.0.1):
+    - FlutterMacOS
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -25,7 +26,6 @@ PODS:
     - CocoaAsyncSocket (~> 7.6)
     - Flutter
     - FlutterMacOS
-  - ReachabilitySwift (5.2.4)
   - share_plus (0.0.1):
     - FlutterMacOS
   - shared_preferences_foundation (0.0.1):
@@ -46,6 +46,7 @@ DEPENDENCIES:
   - FlutterMacOS (from `Flutter/ephemeral`)
   - geolocator_apple (from `Flutter/ephemeral/.symlinks/plugins/geolocator_apple/darwin`)
   - local_auth_darwin (from `Flutter/ephemeral/.symlinks/plugins/local_auth_darwin/darwin`)
+  - package_info_plus (from `Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos`)
   - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
   - patrol (from `Flutter/ephemeral/.symlinks/plugins/patrol/darwin`)
   - share_plus (from `Flutter/ephemeral/.symlinks/plugins/share_plus/macos`)
@@ -56,7 +57,6 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - CocoaAsyncSocket
-    - ReachabilitySwift
 
 EXTERNAL SOURCES:
   app_links:
@@ -75,6 +75,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/geolocator_apple/darwin
   local_auth_darwin:
     :path: Flutter/ephemeral/.symlinks/plugins/local_auth_darwin/darwin
+  package_info_plus:
+    :path: Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos
   path_provider_foundation:
     :path: Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin
   patrol:
@@ -91,17 +93,17 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   app_links: 05a6ec2341985eb05e9f97dc63f5837c39895c3f
   CocoaAsyncSocket: 065fd1e645c7abab64f7a6a2007a48038fdc6a99
-  connectivity_plus: e74b9f74717d2d99d45751750e266e55912baeb5
+  connectivity_plus: 4adf20a405e25b42b9c9f87feff8f4b6fde18a4e
   file_selector_macos: 9e9e068e90ebee155097d00e89ae91edb2374db7
-  flutter_local_notifications: 453432cd6399a07d072885bc7828fb2307868856
+  flutter_local_notifications: 4bf37a31afde695b56091b4ae3e4d9c7a7e6cda0
   flutter_secure_storage_macos: 41994a7fa57a3e302915912c818b68e3875d6d7e
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   geolocator_apple: ab36aa0e8b7d7a2d7639b3b4e48308394e8cef5e
   local_auth_darwin: c3ee6cce0a8d56be34c8ccb66ba31f7f180aaebb
-  path_provider_foundation: 350e9d261268127abe93a19f892e46d0141d43a5
+  package_info_plus: f0052d280d17aa382b932f399edf32507174e870
+  path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
   patrol: 5df5d241d7f95f0df12a6906bbf45acb43a1e537
-  ReachabilitySwift: 32793e867593cfc1177f5d16491e3a197d2fccda
-  share_plus: 3c787998077d6b31e839225a282e9e27edf99274
+  share_plus: 510bf0af1a42cd602274b4629920c9649c52f4cc
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
   sqflite_darwin: c9a06f406aabb73bd916d8eb142697c1c0bef2e2
   url_launcher_macos: f87a979182d112f911de6820aefddaf56ee9fbfd

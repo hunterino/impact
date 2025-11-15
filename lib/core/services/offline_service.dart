@@ -17,7 +17,7 @@ class OfflineService extends ChangeNotifier {
   late Box<dynamic> _metadataBox;
 
   final Connectivity _connectivity = Connectivity();
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   bool _isOnline = true;
   bool get isOnline => _isOnline;
@@ -33,8 +33,9 @@ class OfflineService extends ChangeNotifier {
     _metadataBox = await Hive.openBox('metadata');
 
     // Check initial connectivity
-    final connectivityResult = await _connectivity.checkConnectivity();
-    _isOnline = connectivityResult != ConnectivityResult.none;
+    final connectivityResults = await _connectivity.checkConnectivity();
+    _isOnline = !connectivityResults.contains(ConnectivityResult.none) &&
+                connectivityResults.isNotEmpty;
 
     // Listen for connectivity changes
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
@@ -43,9 +44,9 @@ class OfflineService extends ChangeNotifier {
   }
 
   /// Handle connectivity changes
-  void _handleConnectivityChange(ConnectivityResult result) {
+  void _handleConnectivityChange(List<ConnectivityResult> results) {
     final wasOffline = !_isOnline;
-    _isOnline = result != ConnectivityResult.none;
+    _isOnline = !results.contains(ConnectivityResult.none) && results.isNotEmpty;
 
     if (wasOffline && _isOnline) {
       // Connection restored
